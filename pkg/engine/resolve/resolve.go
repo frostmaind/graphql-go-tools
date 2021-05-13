@@ -200,6 +200,13 @@ type DataSource interface {
 	UniqueIdentifier() []byte
 }
 
+type ComposeBatchFn func(fetches ...SingleFetch) SingleFetch
+
+type BatchConfig struct {
+	Enable  bool
+	Compose ComposeBatchFn
+}
+
 type Resolver struct {
 	EnableSingleFlightLoader bool
 	resultSetPool            sync.Pool
@@ -1229,6 +1236,7 @@ type Array struct {
 	ResolveAsynchronous bool
 	Item                Node
 	Stream              Stream
+	Fetch               Fetch
 }
 
 type Stream struct {
