@@ -16,7 +16,7 @@ func representationPathByIdx(idx int) []string {
 	return []string{"body", "variables", "representations", fmt.Sprintf("[%d]", idx)}
 }
 
-func ConfigureBatch(fetch *resolve.SingleFetch, representationsVars ...resolve.Variables) error {
+func configureEntityBatch(fetch *resolve.SingleFetch, representationsVars ...resolve.Variables) error {
 	rawInput := []byte(fetch.Input)
 
 	initialRepresentation, err := jsonparser.GetUnsafeString(rawInput, representationPathByIdx(0)...)

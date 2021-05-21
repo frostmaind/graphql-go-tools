@@ -879,6 +879,12 @@ type FetchConfiguration struct {
 	Variables            resolve.Variables
 	DataSource           resolve.DataSource
 	DisallowSingleFlight bool
+	Batch                BatchConfiguration
+}
+
+type BatchConfiguration struct {
+	Enabled        bool
+	ConfigureBatch func(fetch *resolve.SingleFetch, variables ...resolve.Variables) error
 }
 
 type configurationVisitor struct {
