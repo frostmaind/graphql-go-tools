@@ -12,50 +12,55 @@ import (
 
 const variableWrapper = "$$"
 
-var representationPath = []string{"body", "variables", "representations", "[0]"}
+func representationPathByIdx(idx int) []string {
+	return []string{"body", "variables", "representations", fmt.Sprintf("[%d]", idx)}
+}
 
-func ComposeFederationEntityBatch(fetch *resolve.SingleFetch, variables ...resolve.Variables) (*resolve.SingleFetch, error) {
-	initialRepresentation, err := jsonparser.GetUnsafeString([]byte(fetch.Input), representationPath...)
+func ConfigureBatch(fetch *resolve.SingleFetch, representationsVars ...resolve.Variables) error {
+	rawInput := []byte(fetch.Input)
+
+	initialRepresentation, err := jsonparser.GetUnsafeString(rawInput, representationPathByIdx(0)...)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	batchRepresentations := make([]string, 0, len(variables)+1)
-	batchVariables := make(resolve.Variables, 0, len(variables)+1)
-	// add the representation and variables from SingleFetch
-	batchRepresentations = append(batchRepresentations, initialRepresentation)
-	batchVariables = append(batchVariables, fetch.Variables...)
 
 	variablesCount := len(fetch.Variables)
 	segments := strings.Split(initialRepresentation, variableWrapper)
-	segmentIdxToVarIdx := make(map[int]int, len(variables))
+	segmentIdxToVarIdx := make(map[int]int, len(representationsVars))
 
 	for segIdx, seg := range segments {
 		if segIdx%2 == 0 { // variable always has an even index
 			if segmentIdxToVarIdx[segIdx], err = strconv.Atoi(seg); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
 
-	for i := range variables {
-		totalVarOrderNum := i + 1 // the first element is variables from initial fetch
+	for i := range representationsVars {
+		batchRepresentationIdx := i + 1 // the first element is representationsVars from initial fetch
 
 		for segIdx, varIdx := range segmentIdxToVarIdx {
-			segments[segIdx] = strconv.Itoa(varIdx + totalVarOrderNum*variablesCount)
+			segments[segIdx] = strconv.Itoa(varIdx + batchRepresentationIdx*variablesCount)
 		}
 
-		batchRepresentations = append(batchRepresentations, strings.Join(segments, variableWrapper))
+		representation := []byte(strings.Join(segments, variableWrapper))
+		representationPath := representationPathByIdx(batchRepresentationIdx)
 
-		varPathPrefix := fmt.Sprintf("[%d]", totalVarOrderNum)
-		for _, variable := range variables[i] {
+		if rawInput, err = jsonparser.Set(rawInput, representation, representationPath...); err != nil {
+			return err
+		}
+
+		varPathPrefix := fmt.Sprintf("[%d]", batchRepresentationIdx)
+		for _, variable := range representationsVars[i] {
 			if v, ok := variable.(*resolve.ObjectVariable); ok {
 				v.Path = append([]string{varPathPrefix}, v.Path...)
 			}
 
-			batchVariables = append(batchVariables, variable)
+			fetch.Variables = append(fetch.Variables, variable)
 		}
 	}
 
-	return nil, nil
+	fetch.Input = string(rawInput)
+
+	return nil
 }
