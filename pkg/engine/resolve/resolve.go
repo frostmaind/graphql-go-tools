@@ -889,41 +889,49 @@ func (r *Resolver) freeResultSet(set *resultSet) {
 	r.resultSetPool.Put(set)
 }
 
-func (r *Resolver) resolveFetch(ctx *Context, fetch Fetch, data []byte, set *resultSet) (err error) {
+func (r *Resolver) resolveFetchPlan(ctx *Context, fetch Fetch, data []byte) (err error) {
 	switch f := fetch.(type) {
 	case *SingleFetch:
+		set := r.getResultSet()
+		defer r.freeResultSet(set)
+
 		preparedInput := r.getBufPair()
 		defer r.freeBufPair(preparedInput)
-		err = r.prepareSingleFetch(ctx, f, data, set, preparedInput.Data)
+
+		if err = f.InputTemplate.Render(ctx, data, preparedInput.Data); err != nil {
+			return err
+		}
+
+		err = r.resolveSingleFetch(ctx, f, preparedInput.Data, set.buffers[f.BufferId])
+	case *BatchFetch: // @TODO fix, it doesnt combine input params
+		preparedInput := r.getBufPair()
+		defer r.freeBufPair(preparedInput)
+
+		err = r.prepareSingleFetch(ctx, f.Fetch, data, set, preparedInput.Data)
 		if err != nil {
 			return err
 		}
-		err = r.resolveSingleFetch(ctx, f, preparedInput.Data, set.buffers[f.BufferId])
+
+		err = r.resolveSingleFetch(ctx, f.Fetch, preparedInput.Data, set.buffers[f.Fetch.BufferId])
 	case *ParallelFetch:
-		preparedInputs := r.getBufPairSlice()
-		defer r.freeBufPairSlice(preparedInputs)
-		for i := range f.Fetches {
-			preparedInput := r.getBufPair()
-			err = r.prepareSingleFetch(ctx, f.Fetches[i], data, set, preparedInput.Data)
-			if err != nil {
-				return err
-			}
-			*preparedInputs = append(*preparedInputs, preparedInput)
-		}
 		wg := r.getWaitGroup()
 		defer r.freeWaitGroup(wg)
+
+		wg.Add(len(f.Fetches))
 		for i := range f.Fetches {
-			preparedInput := (*preparedInputs)[i]
-			singleFetch := f.Fetches[i]
-			buf := set.buffers[f.Fetches[i].BufferId]
-			wg.Add(1)
-			go func(s *SingleFetch, buf *BufPair) {
-				_ = r.resolveSingleFetch(ctx, s, preparedInput.Data, buf)
+			go func() {
+				_ = r.resolveFetchPlan(ctx, f.Fetches[i], data, set) // @ TODO add error handling
 				wg.Done()
-			}(singleFetch, buf)
+			}()
 		}
 		wg.Wait()
 	}
+
+	return
+}
+
+// @TODO missing implementation
+func (r *Resolver) resolveFetch(ctx *Context, fetch Fetch, data []byte, set *resultSet) (err error) {
 	return
 }
 
@@ -1188,7 +1196,7 @@ func (_ *SingleFetch) FetchKind() FetchKind {
 }
 
 type ParallelFetch struct {
-	Fetches []*SingleFetch
+	Fetches Fetches
 }
 
 func (_ *ParallelFetch) FetchKind() FetchKind {
@@ -1200,7 +1208,7 @@ type BatchFetch struct {
 	configureBatch func(fetch *SingleFetch, variables ...Variables) error
 }
 
-func (_ *BatchFetch)  FetchKind() FetchKind {
+func (_ *BatchFetch) FetchKind() FetchKind {
 	return FetchKindBatch
 }
 

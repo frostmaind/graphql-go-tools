@@ -740,14 +740,18 @@ func (v *Visitor) configureObjectFetch(config objectFetchConfiguration) {
 	fetch := v.configureSingleFetch(config, fetchConfig)
 	v.resolveInputTemplates(config, &fetch.Input, &fetch.Variables)
 	if config.object.Fetch == nil {
-		config.object.Fetch = fetch
+		if fetchConfig.Batch.Enabled {
+			config.object.Fetch = &resolve.BatchFetch{Fetch: fetch}
+		} else {
+			config.object.Fetch = fetch
+		}
+
 		return
 	}
 	switch existing := config.object.Fetch.(type) {
-	case *resolve.SingleFetch:
-		copyOfExisting := *existing
+	case *resolve.SingleFetch, *resolve.BatchFetch:
 		parallel := &resolve.ParallelFetch{
-			Fetches: []*resolve.SingleFetch{&copyOfExisting, fetch},
+			Fetches: []resolve.Fetch{existing, fetch},
 		}
 		config.object.Fetch = parallel
 	case *resolve.ParallelFetch:
