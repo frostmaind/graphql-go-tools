@@ -942,6 +942,29 @@ func (r *Resolver) prepareSingleFetch(ctx *Context, fetch *SingleFetch, data []b
 	return
 }
 
+// @TODO optimize
+func (r *Resolver) prepareBatchFetch(ctx *Context, fetch *BatchFetch, data []byte) error {
+	arrayItems := r.byteSlicesPool.Get().(*[][]byte)
+	defer func() {
+		*arrayItems = (*arrayItems)[:0]
+		r.byteSlicesPool.Put(arrayItems)
+	}()
+
+	jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		*arrayItems = append(*arrayItems, value)
+	})
+
+	preparedInput := r.getBufPair()
+	defer r.freeBufPair(preparedInput)
+
+	for i := range *arrayItems {
+		// @TODO finished here
+		if err := fetch.Fetch.InputTemplate.Render(ctx, (*arrayItems)[i], preparedInput.Data); err != nil {
+			return err
+		}
+	}
+}
+
 func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
 
 	if ctx.beforeFetchHook != nil {
