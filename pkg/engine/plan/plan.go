@@ -888,7 +888,7 @@ type FetchConfiguration struct {
 
 type BatchConfiguration struct {
 	Enabled        bool
-	ConfigureBatch func(fetch *resolve.SingleFetch, variables ...resolve.Variables) error
+	MergeInputs func(dst []byte, rest ...[]byte) error
 }
 
 type configurationVisitor struct {

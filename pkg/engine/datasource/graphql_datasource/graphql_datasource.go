@@ -161,8 +161,8 @@ func (p *Planner) ConfigureFetch() plan.FetchConfiguration {
 		DisallowSingleFlight: p.disallowSingleFlight,
 		// currently batch is available only for apollo federation
 		Batch: plan.BatchConfiguration{
-			Enabled:        p.config.Federation.Enabled,
-			ConfigureBatch: configureEntityBatch,
+			Enabled:     p.config.Federation.Enabled,
+			MergeInputs: mergeFederationInputs,
 		},
 	}
 }
