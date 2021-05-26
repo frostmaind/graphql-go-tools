@@ -895,7 +895,8 @@ func (r *Resolver) resolveQueryPlan(ctx *Context, node Node, data []byte) (err e
 	case *Object:
 
 		if n.Fetch != nil {
-			if err = r.executeFetch(ctx, n, n.Fetch, data); err != nil {
+			_, err := r.executeFetch(ctx, n, n.Fetch, data)
+			if err != nil {
 				return err
 			}
 		}
@@ -917,7 +918,7 @@ func (r *Resolver) resolveQueryPlan(ctx *Context, node Node, data []byte) (err e
 }
 
 // @TODO add merging response with `data` inside executeFetch
-func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data []byte) (err error) {
+func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data []byte) (result []byte, err error) {
 	switch f := fetch.(type) {
 	case *SingleFetch:
 
@@ -928,7 +929,7 @@ func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data 
 		defer r.freeBufPair(resultPair)
 
 		if err = f.InputTemplate.Render(ctx, data, preparedInput.Data); err != nil {
-			return err
+			return nil, err
 		}
 
 		err = r.resolveSingleFetch(ctx, f, preparedInput.Data, resultPair)
@@ -937,13 +938,14 @@ func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data 
 		preparedInput := r.getBufPair()
 		defer r.freeBufPair(preparedInput)
 
-		resultPair := r.getBufPair()
-		defer r.freeBufPair(resultPair)
 
 		err = r.prepareBatchFetch(ctx, f, data, preparedInput.Data)
 		if err != nil {
-			return err
+			return nil, err
 		}
+
+		resultPair := r.getBufPair()
+		defer r.freeBufPair(resultPair)
 
 		err = r.resolveSingleFetch(ctx, f.Fetch, preparedInput.Data, resultPair)
 	case *ParallelFetch:
@@ -955,7 +957,7 @@ func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data 
 		for i := range f.Fetches {
 			go func(i int) {
 				// @TODO add error handling, how to compose response with data
-				_ = r.executeFetch(ctx, object, f.Fetches[i], data)
+				_, _ = r.executeFetch(ctx, object, f.Fetches[i], data)
 				wg.Done()
 			}(i)
 		}
@@ -1078,6 +1080,13 @@ func (r *Resolver) prepareBatchFetch(ctx *Context, fetch *BatchFetch, data []byt
 		*arrayItems = append(*arrayItems, value)
 	})
 
+
+	inputItems := r.byteSlicesPool.Get().(*[][]byte)
+	defer func() {
+		*inputItems = (*inputItems)[:0]
+		r.byteSlicesPool.Put(inputItems)
+	}()
+
 	tempInput := r.getBufPair()
 	defer func() { r.freeBufPair(tempInput) }()
 
@@ -1086,15 +1095,16 @@ func (r *Resolver) prepareBatchFetch(ctx *Context, fetch *BatchFetch, data []byt
 			return err
 		}
 
-		if i == 0 {
-			preparedInput.WriteBytes(tempInput.Data.Bytes())
-			continue
-		}
-
-		if err := fetch.MergeInputs(preparedInput.Bytes(), tempInput.Data.Bytes()); err != nil {
-			return err
-		}
+		*inputItems = append(*inputItems, tempInput.Data.Bytes())
 	}
+
+	// @TODO possible performance issue, try to pass fast buffer to MergeInputs
+	result, err := fetch.MergeInputs(*inputItems...)
+	if err != nil {
+		return err
+	}
+
+	preparedInput.WriteBytes(result)
 
 	return nil
 }
@@ -1420,7 +1430,7 @@ func (_ *ParallelFetch) FetchKind() FetchKind {
 
 type BatchFetch struct {
 	Fetch       *SingleFetch
-	MergeInputs func(dst []byte, rest ...[]byte) error
+	MergeInputs func(inputs ...[]byte) (result []byte, err error)
 }
 
 func (_ *BatchFetch) FetchKind() FetchKind {

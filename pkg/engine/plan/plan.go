@@ -741,7 +741,7 @@ func (v *Visitor) configureObjectFetch(config objectFetchConfiguration) {
 	v.resolveInputTemplates(config, &fetch.Input, &fetch.Variables)
 	if config.object.Fetch == nil {
 		if fetchConfig.Batch.Enabled {
-			config.object.Fetch = &resolve.BatchFetch{Fetch: fetch}
+			config.object.Fetch = &resolve.BatchFetch{Fetch: fetch, MergeInputs: fetchConfig.Batch.MergeInputs}
 		} else {
 			config.object.Fetch = fetch
 		}
@@ -888,7 +888,7 @@ type FetchConfiguration struct {
 
 type BatchConfiguration struct {
 	Enabled        bool
-	MergeInputs func(dst []byte, rest ...[]byte) error
+	MergeInputs func(inputs ...[]byte) (result []byte, err error)
 }
 
 type configurationVisitor struct {

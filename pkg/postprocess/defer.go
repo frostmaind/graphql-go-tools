@@ -137,10 +137,29 @@ func (p *ProcessDefer) processFieldSetBuffer(object *resolve.Object, field int) 
 		patchFetch.BufferId = 0
 		p.objects[len(p.objects)-1].Fetch = nil
 		return patchFetch, true
+	case *resolve.BatchFetch:
+		if fetch.Fetch.BufferId != id {
+			return patchFetch, false
+		}
+		patchFetch = *fetch.Fetch
+		patchFetch.BufferId = 0
+		p.objects[len(p.objects)-1].Fetch = nil
+		return patchFetch, true
 	case *resolve.ParallelFetch:
+		var singleFetch *resolve.SingleFetch
 		for k := range fetch.Fetches {
-			if id == fetch.Fetches[k].BufferId {
-				patchFetch = *fetch.Fetches[k]
+
+			switch f := fetch.Fetches[k].(type) {
+			case *resolve.SingleFetch:
+				singleFetch = f
+			case *resolve.BatchFetch:
+				singleFetch = f.Fetch
+			default:
+				continue
+			}
+
+			if id == singleFetch.BufferId {
+				patchFetch = *singleFetch
 				patchFetch.BufferId = 0
 				fetch.Fetches = append(fetch.Fetches[:k], fetch.Fetches[k+1:]...)
 				if len(fetch.Fetches) == 1 {

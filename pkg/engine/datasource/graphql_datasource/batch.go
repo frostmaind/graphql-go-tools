@@ -1,40 +1,38 @@
 package graphql_datasource
 
 import (
-	"fmt"
+	"bytes"
 
 	"github.com/buger/jsonparser"
 )
 
 var representationPath = []string{"body", "variables", "representations"}
 
-func representationPathByIdx(idx int) []string {
-	return []string{"body", "variables", "representations", fmt.Sprintf("[%d]", idx)}
-}
-
-func mergeFederationInputs(dst []byte, rest ...[]byte) error {
-	if len(rest) == 0 {
-		return nil
+func mergeFederationInputs(inputs ...[]byte) ([]byte, error) {
+	if len(inputs) == 0 {
+		return nil, nil
 	}
 
-	var nextIndex int
+	var variables [][]byte
 
-	_, err := jsonparser.ArrayEach(dst, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		nextIndex++
-	}, representationPath...)
-	if err != nil {
-		return err
-	}
-
-	for i := range rest {
-		_, err = jsonparser.ArrayEach(rest[i], func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-			_, _ = jsonparser.Set(dst, value, representationPathByIdx(nextIndex)...)
-			nextIndex++
+	for i := range inputs {
+		_, err := jsonparser.ArrayEach(inputs[i], func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+			variables = append(variables, value)
 		}, representationPath...)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	representationJson := append([]byte("["), append(bytes.Join(variables, []byte(",")), []byte("]")...)...)
+
+	result := make([]byte, len(inputs[0]))
+	copy(result, inputs[0])
+
+	result, err := jsonparser.Set(result, representationJson, representationPath...)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
