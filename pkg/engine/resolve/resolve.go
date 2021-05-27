@@ -890,31 +890,50 @@ func (r *Resolver) freeResultSet(set *resultSet) {
 }
 
 // @TODO unfinished
-func (r *Resolver) resolveQueryPlan(ctx *Context, node Node, data []byte) (err error) {
+func (r *Resolver) resolveQueryPlan(ctx *Context, node Node, data []byte) (response []byte, err error) {
 	switch n := node.(type) {
 	case *Object:
 
 		if n.Fetch != nil {
-			_, err := r.executeFetch(ctx, n, n.Fetch, data)
+			data, err = r.executeFetch(ctx, n, n.Fetch, data)
 			if err != nil {
-				return err
+				return nil,  err
 			}
 		}
 
-		for i := range n.Fields {
-			if err = r.resolveQueryPlan(ctx, n.Fields[i].Value, data); err != nil {
-				return err
-			}
-		}
+		for _, field := range n.Fields {
+			var path []string
 
+			switch f := field.Value.(type) {
+			case *Object:
+				path = f.Path
+			case *Array:
+				path = f.Path
+			default:
+				continue
+			}
+
+			val, _, _, err := jsonparser.Get(data, path...)
+			if err != nil {
+				return nil, err
+			}
+
+			response, err = r.resolveQueryPlan(ctx, field.Value, val)
+			if err != nil {
+				return nil, err
+			}
+
+			return r.mergeObjectResult(data, response, path)
+		}
+	// @TODO handle array case
 	case *Array:
 
-
-
+	default:
+		return data, nil
 
 	}
 
-	return nil
+	return nil, nil
 }
 
 // @TODO add merging response with `data` inside executeFetch
@@ -932,12 +951,16 @@ func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data 
 			return nil, err
 		}
 
-		err = r.resolveSingleFetch(ctx, f, preparedInput.Data, resultPair)
+		if err = r.resolveSingleFetch(ctx, f, preparedInput.Data, resultPair); err != nil {
+			return nil, err
+		}
+
+		result, err = r.mergeObjectResult(data, resultPair.Data.Bytes(), []string{fmt.Sprintf("fetch_%d", f.BufferId)})
+
 	case *BatchFetch:
 
 		preparedInput := r.getBufPair()
 		defer r.freeBufPair(preparedInput)
-
 
 		err = r.prepareBatchFetch(ctx, f, data, preparedInput.Data)
 		if err != nil {
@@ -947,17 +970,27 @@ func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data 
 		resultPair := r.getBufPair()
 		defer r.freeBufPair(resultPair)
 
-		err = r.resolveSingleFetch(ctx, f.Fetch, preparedInput.Data, resultPair)
+		if err = r.resolveSingleFetch(ctx, f.Fetch, preparedInput.Data, resultPair); err != nil {
+			return nil, err
+		}
+
+		result, err = r.mergeArrayResult(data, resultPair.Data.Bytes(), []string{fmt.Sprintf("fetch_%d", f.Fetch.BufferId)})
+	// @TODO save result from parallel fetch
 	case *ParallelFetch:
 
 		wg := r.getWaitGroup()
 		defer r.freeWaitGroup(wg)
 
 		wg.Add(len(f.Fetches))
+
+		resultCh := make(chan []byte, len(f.Fetches))
+
 		for i := range f.Fetches {
 			go func(i int) {
 				// @TODO add error handling, how to compose response with data
-				_, _ = r.executeFetch(ctx, object, f.Fetches[i], data)
+				response, _ := r.executeFetch(ctx, object, f.Fetches[i], data)
+				resultCh <- response
+
 				wg.Done()
 			}(i)
 		}
@@ -966,6 +999,47 @@ func (r *Resolver) executeFetch(ctx *Context, object *Object, fetch Fetch, data 
 	}
 
 	return
+}
+
+func (r *Resolver) mergeObjectResult(data, response []byte, path [] string) ([]byte, error) {
+	result := make([]byte, len(data))
+	copy(result, data)
+
+	return jsonparser.Set(data, response, path...)
+}
+
+func (r *Resolver) mergeArrayResult(data, response []byte, path [] string) ([]byte, error) {
+	var inputs [][]byte
+
+	_, err := jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		inputs = append(inputs, value)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([][]byte, 0, len(inputs))
+
+	_, err = jsonparser.ArrayEach(response, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		responses = append(responses, value)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	merged := make([][]byte, 0, len(inputs))
+
+	for i := range responses {
+		result, err := r.mergeObjectResult(inputs[i], responses[i], path)
+		if err != nil {
+			return nil, err
+		}
+
+		merged = append(merged, result)
+	}
+
+	result := append([]byte(""), append(bytes.Join(merged, []byte(",")), []byte("]")...)...)
+	return result, nil
 }
 
 //func (r *Resolver) executeFetch(ctx *Context, fetch Fetch, data []byte) (err error) {
@@ -1079,7 +1153,6 @@ func (r *Resolver) prepareBatchFetch(ctx *Context, fetch *BatchFetch, data []byt
 	jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 		*arrayItems = append(*arrayItems, value)
 	})
-
 
 	inputItems := r.byteSlicesPool.Get().(*[][]byte)
 	defer func() {

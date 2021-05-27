@@ -889,7 +889,7 @@ var (
 		{"locations"},
 		{"path"},
 	}
-	entitiesPath     = []string{"_entities", "[0]"}
+	entitiesPath     = []string{"_entities"}
 	uniqueIdentifier = []byte(UniqueIdentifier)
 )
 
