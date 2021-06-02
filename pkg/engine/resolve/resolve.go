@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode"
@@ -92,6 +93,7 @@ type Context struct {
 	currentPatch    int
 	maxPatch        int
 	pathPrefix      []byte
+	refCounter      *refCounter
 	beforeFetchHook BeforeFetchHook
 	afterFetchHook  AfterFetchHook
 }
@@ -110,6 +112,7 @@ func NewContext(ctx context.Context) *Context {
 		usedBuffers:  make([]*bytes.Buffer, 0, 48),
 		currentPatch: -1,
 		maxPatch:     -1,
+		refCounter:   newRefCount(),
 	}
 }
 
@@ -128,6 +131,7 @@ func (c *Context) Free() {
 	c.beforeFetchHook = nil
 	c.afterFetchHook = nil
 	c.Request.Header = nil
+	c.refCounter = newRefCount()
 }
 
 func (c *Context) SetBeforeFetchHook(hook BeforeFetchHook) {
@@ -187,6 +191,108 @@ func (c *Context) popNextPatch() (patch patch, ok bool) {
 type patch struct {
 	path, extraPath, data []byte
 	index                 int
+}
+
+type refCounter struct {
+	pathToNodeCounter    map[string]int
+	pathToChildReadiness map[string]map[string]pathReadinessState
+
+	mux *sync.Mutex
+}
+
+type pathReadinessState struct {
+	done   chan struct{}
+	called int
+}
+
+func (r *refCounter) addArrayPath(paths [][]byte, num int) {
+	arrayPath := make([][]byte, len(paths))
+	copy(arrayPath, paths)
+	arrayPath = append(arrayPath, []byte{'@'})
+
+	r.add(arrayPath, num)
+}
+
+func (r *refCounter) add(paths [][]byte, num int) {
+	key := r.buildKey(paths)
+	if key == "" {
+		return
+	}
+
+	r.mux.Lock()
+	defer r.mux.Unlock()
+
+
+	parentKey := r.buildKey(paths[:len(paths)-1])
+	fieldName := string(r.convertKey(paths[len(paths)-1]))
+	r.pathToNodeCounter[key] += num
+
+	parentReadinessMap, ok := r.pathToChildReadiness[parentKey]
+	if !ok {
+		parentReadinessMap = make(map[string]pathReadinessState, 5)
+		r.pathToChildReadiness[parentKey] = parentReadinessMap
+	}
+
+	readinessState, ok := parentReadinessMap[fieldName]
+	if !ok {
+		readinessState.done = make(chan struct{})
+	}
+
+	readinessState.called++
+	parentNum := r.pathToNodeCounter[parentKey]
+
+	if parentNum == readinessState.called {
+		close(readinessState.done)
+	}
+}
+
+func (r *refCounter) get(paths [][]byte) int {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+
+	return r.pathToNodeCounter[r.buildKey(paths)]
+}
+
+func (r *refCounter) waitForReady(paths [][]byte) {
+	fieldName := string(r.convertKey(paths[len(paths)-1]))
+	if fieldName == "" {
+		return
+	}
+
+	parentKey := r.buildKey(paths[:len(paths)-1])
+
+	r.mux.Lock()
+	readinessState := r.pathToChildReadiness[parentKey][fieldName]
+	r.mux.Unlock()
+
+	<- readinessState.done
+}
+
+// @TODO rewrite, it's not efficient
+func (r *refCounter) buildKey(paths [][]byte) string {
+	var builder strings.Builder
+
+	for _, path := range paths {
+		_, _ = builder.Write(r.convertKey(path))
+	}
+
+	return builder.String()
+}
+
+func (r *refCounter) convertKey(key []byte) []byte {
+	if _, err := strconv.Atoi(string(key)); err != nil {
+		return []byte{'@'}
+	}
+
+	return key
+}
+
+func newRefCount() *refCounter {
+	return &refCounter{
+		pathToNodeCounter: make(map[string]int, 50),
+		pathToChildReadiness: make(map[string]map[string]pathReadinessState, 50),
+		mux:               &sync.Mutex{},
+	}
 }
 
 type Fetch interface {
@@ -651,6 +757,16 @@ func (r *Resolver) resolveArrayAsynchronous(ctx *Context, array *Array, arrayIte
 
 	wg.Add(len(*arrayItems))
 
+	// @TODO refactor
+	fmt.Println("Array ctx", pathToString(ctx.pathElements))
+	arrayPath := append(make([][]byte, 0 , len(ctx.pathElements) + 1), ctx.pathElements...)
+	arrayPath = append(arrayPath, []byte{'@'})
+	fmt.Println("Array, before", pathToString(arrayPath))
+	ctx.refCounter.add(arrayPath, len(*arrayItems))
+	ctx.refCounter.waitForReady(arrayPath)
+	fmt.Println("Array, after", pathToString(arrayPath))
+	//
+
 	for i := range *arrayItems {
 		itemBuf := r.getBufPair()
 		*bufSlice = append(*bufSlice, itemBuf)
@@ -786,8 +902,18 @@ func (r *Resolver) resolveNull(b *fastbuffer.FastBuffer) {
 	b.WriteBytes(null)
 }
 
-func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, objectBuf *BufPair) (err error) {
+func pathToString(path [][]byte) []string {
+	result := make([]string, 0,len(path))
 
+	for _, p := range path {
+		result = append(result, string(p))
+	}
+
+	return result
+}
+
+func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, objectBuf *BufPair) (err error) {
+	fmt.Println("ctx.Path", pathToString(ctx.pathElements))
 	if len(object.Path) != 0 {
 		data, _, _, _ = jsonparser.Get(data, object.Path...)
 	}
@@ -841,6 +967,15 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 		objectBuf.Data.WriteBytes(quote)
 		objectBuf.Data.WriteBytes(colon)
 		ctx.addPathElement(object.Fields[i].Name)
+		// @TODO it can be done once for whole path
+		fmt.Println("Object, before", pathToString(ctx.pathElements))
+		switch object.Fields[i].Value.(type) {
+		case *Object:
+			ctx.refCounter.add(ctx.pathElements, 1)
+			ctx.refCounter.waitForReady(ctx.pathElements)
+		}
+		fmt.Println("Object, after", pathToString(ctx.pathElements))
+		//
 		err = r.resolveNode(ctx, object.Fields[i].Value, fieldData, fieldBuf)
 		ctx.removeLastPathElement()
 		if err != nil {
