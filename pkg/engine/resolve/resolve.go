@@ -683,6 +683,16 @@ func (r *Resolver) resolveArray(ctx *Context, array *Array, data []byte, arrayBu
 		*arrayItems = append(*arrayItems, value)
 	}, array.Path...)
 
+	// @TODO refactor
+	//fmt.Println("Array ctx", pathToString(ctx.pathElements))
+	arrayPath := append(make([][]byte, 0, len(ctx.pathElements)+1), ctx.pathElements...)
+	arrayPath = append(arrayPath, []byte{'@'})
+	//fmt.Println("Array, before", pathToString(arrayPath))
+	ctx.refCounter.add(arrayPath, len(*arrayItems))
+	ctx.refCounter.waitForReady(arrayPath)
+	//fmt.Println("Array, after", pathToString(arrayPath))
+	//
+
 	if len(*arrayItems) == 0 {
 		if !array.Nullable {
 			r.resolveEmptyArray(arrayBuf.Data)
@@ -759,16 +769,6 @@ func (r *Resolver) resolveArrayAsynchronous(ctx *Context, array *Array, arrayIte
 	defer r.freeErrChan(errCh)
 
 	wg.Add(len(*arrayItems))
-
-	// @TODO refactor
-	//fmt.Println("Array ctx", pathToString(ctx.pathElements))
-	arrayPath := append(make([][]byte, 0, len(ctx.pathElements)+1), ctx.pathElements...)
-	arrayPath = append(arrayPath, []byte{'@'})
-	//fmt.Println("Array, before", pathToString(arrayPath))
-	ctx.refCounter.add(arrayPath, len(*arrayItems))
-	ctx.refCounter.waitForReady(arrayPath)
-	//fmt.Println("Array, after", pathToString(arrayPath))
-	//
 
 	for i := range *arrayItems {
 		itemBuf := r.getBufPair()
