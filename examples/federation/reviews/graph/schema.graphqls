@@ -1,12 +1,11 @@
 type Review {
     body: String!
-    author: User! @provides(fields: "username")
+    author: User!
     product: Product!
 }
 
 extend type User @key(fields: "id") {
     id: ID! @external
-    username: String! @external
     reviews: [Review]
 }
 
