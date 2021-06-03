@@ -205,12 +205,9 @@ type pathReadinessState struct {
 	called int
 }
 
-func (r *refCounter) addArrayPath(paths [][]byte, num int) {
-	arrayPath := make([][]byte, len(paths))
-	copy(arrayPath, paths)
-	arrayPath = append(arrayPath, []byte{'@'})
-
-	r.add(arrayPath, num)
+func (r *refCounter) reset() {
+	r.pathToNodeCounter = make(map[string]int, 50)
+	r.pathToChildReadiness = make(map[string]map[string]pathReadinessState, 50)
 }
 
 func (r *refCounter) add(paths [][]byte, num int) {
@@ -240,7 +237,10 @@ func (r *refCounter) add(paths [][]byte, num int) {
 	readinessState.called++
 	parentReadinessMap[fieldName] = readinessState
 	parentNum := r.pathToNodeCounter[parentKey]
-	//fmt.Println("add key", key, "called", readinessState.called, "parentKey", parentKey, "parentNum", parentNum)
+	defer func() {
+		fmt.Println("add key", key, "called", readinessState.called, "parentKey", parentKey, "parentNum", parentNum)
+
+	}()
 	if parentNum == readinessState.called {
 		close(readinessState.done)
 	}
@@ -515,10 +515,21 @@ func (r *Resolver) ResolveGraphQLSubscription(ctx *Context, subscription *GraphQ
 		if !ok {
 			return nil
 		}
+
+		fmt.Printf("\n")
+		fmt.Printf("\n")
+		fmt.Println(">>>>>>>>>>>>>>>>>>>>")
+		fmt.Println(">>>>>>>>>>>>>>>>>>>>")
+		fmt.Printf("\n")
+		fmt.Printf("\n")
+
 		err = r.ResolveGraphQLResponse(ctx, subscription.Response, data, writer)
 		if err != nil {
 			return err
 		}
+
+		ctx.refCounter.reset()
+
 		writer.Flush()
 	}
 }
@@ -1024,7 +1035,6 @@ func (r *Resolver) freeResultSet(set *resultSet) {
 }
 
 func (r *Resolver) resolveFetch(ctx *Context, fetch Fetch, data []byte, set *resultSet) (err error) {
-	fmt.Println("resolve fetch count", pathToString(ctx.pathElements), ctx.refCounter.get(ctx.pathElements))
 	ctx.refCounter.get(ctx.pathElements)
 
 	switch f := fetch.(type) {
@@ -1072,6 +1082,10 @@ func (r *Resolver) prepareSingleFetch(ctx *Context, fetch *SingleFetch, data []b
 }
 
 func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
+	fmt.Printf("\n")
+	fmt.Println("resolve fetch count", pathToString(ctx.pathElements), ctx.refCounter.get(ctx.pathElements))
+	fmt.Println("request", string(preparedInput.Bytes()))
+	fmt.Printf("\n")
 
 	if ctx.beforeFetchHook != nil {
 		ctx.beforeFetchHook.OnBeforeFetch(r.hookCtx(ctx), preparedInput.Bytes())
