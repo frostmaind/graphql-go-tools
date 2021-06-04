@@ -159,6 +159,10 @@ func (p *Planner) ConfigureFetch() plan.FetchConfiguration {
 		},
 		Variables:            p.variables,
 		DisallowSingleFlight: p.disallowSingleFlight,
+		BatchFetchConfiguration: plan.BatchFetchConfiguration{
+			Enabled:      p.extractEntities,
+			PrepareBatch: mergeFederationInputs,
+		},
 	}
 }
 
@@ -176,7 +180,7 @@ func (p *Planner) ConfigureSubscription() plan.SubscriptionConfiguration {
 	return plan.SubscriptionConfiguration{
 		Input:                 string(input),
 		SubscriptionManagerID: "graphql_websocket_subscription",
-		Variables:            p.variables,
+		Variables:             p.variables,
 	}
 }
 
@@ -891,7 +895,6 @@ var (
 type Source struct {
 	client httpclient.Client
 }
-
 
 func (s *Source) Load(ctx context.Context, input []byte, bufPair *resolve.BufPair) (err error) {
 	buf := pool.BytesBuffer.Get()

@@ -95,6 +95,7 @@ type Context struct {
 	maxPatch        int
 	pathPrefix      []byte
 	refCounter      *refCounter
+	dataLoaders     *dataLoaders
 	beforeFetchHook BeforeFetchHook
 	afterFetchHook  AfterFetchHook
 }
@@ -114,6 +115,7 @@ func NewContext(ctx context.Context) *Context {
 		currentPatch: -1,
 		maxPatch:     -1,
 		refCounter:   newRefCount(),
+		dataLoaders:  newDataLoaders(),
 	}
 }
 
@@ -133,6 +135,7 @@ func (c *Context) Free() {
 	c.afterFetchHook = nil
 	c.Request.Header = nil
 	c.refCounter = newRefCount()
+	c.dataLoaders = newDataLoaders()
 }
 
 func (c *Context) SetBeforeFetchHook(hook BeforeFetchHook) {
@@ -189,9 +192,43 @@ func (c *Context) popNextPatch() (patch patch, ok bool) {
 	return c.patches[c.currentPatch], true
 }
 
+func (c *Context) getDataLoader(fetch *BatchFetch) *DataLoader {
+	totalCount := c.refCounter.get(c.pathElements)
+	return c.dataLoaders.get(c.refCounter.buildKey(c.pathElements), fetch, totalCount)
+}
+
 type patch struct {
 	path, extraPath, data []byte
 	index                 int
+}
+
+type dataLoaders struct {
+	pathToDataloader map[string]*DataLoader
+
+	mux *sync.Mutex
+}
+
+// @TODO rewrite work with key
+func (d *dataLoaders) get(key string, fetch *BatchFetch, totalNum int) *DataLoader {
+	d.mux.Lock()
+	d.mux.Unlock()
+
+	if _, ok := d.pathToDataloader[key]; !ok {
+		d.pathToDataloader[key] = NewDataLoader(fetch, totalNum)
+	}
+
+	return d.pathToDataloader[key]
+}
+
+func (d *dataLoaders) reset() {
+	d.pathToDataloader = make(map[string]*DataLoader)
+}
+
+func newDataLoaders() *dataLoaders {
+	return &dataLoaders{
+		pathToDataloader: make(map[string]*DataLoader),
+		mux:              &sync.Mutex{},
+	}
 }
 
 type refCounter struct {
@@ -535,6 +572,7 @@ func (r *Resolver) ResolveGraphQLSubscription(ctx *Context, subscription *GraphQ
 		}
 
 		ctx.refCounter.reset()
+		ctx.dataLoaders.reset()
 
 		writer.Flush()
 	}
@@ -1052,32 +1090,68 @@ func (r *Resolver) resolveFetch(ctx *Context, fetch Fetch, data []byte, set *res
 			return err
 		}
 		err = r.resolveSingleFetch(ctx, f, preparedInput.Data, set.buffers[f.BufferId])
+	case *BatchFetch:
+		preparedInput := r.getBufPair()
+		defer r.freeBufPair(preparedInput)
+		err = r.prepareSingleFetch(ctx, f.Fetch, data, set, preparedInput.Data)
+		if err != nil {
+			return err
+		}
+		err = r.resolveBatchFetch(ctx, f, preparedInput.Data, set.buffers[f.Fetch.BufferId])
 	case *ParallelFetch:
-		preparedInputs := r.getBufPairSlice()
-		defer r.freeBufPairSlice(preparedInputs)
-		for i := range f.Fetches {
+		r.resolveParallelFetch(ctx, f, data, set)
+	}
+	return
+}
+
+// TODO try to make resolveFetch recursive
+func (r *Resolver) resolveParallelFetch(ctx *Context, fetch *ParallelFetch, data []byte, set *resultSet) (err error) {
+	preparedInputs := r.getBufPairSlice()
+	defer r.freeBufPairSlice(preparedInputs)
+
+	resolvers := make([]func() error, 0, len(fetch.Fetches))
+
+	wg := r.getWaitGroup()
+	defer r.freeWaitGroup(wg)
+
+	for i := range fetch.Fetches {
+		wg.Add(1)
+		switch f := fetch.Fetches[i].(type) {
+		case *SingleFetch:
 			preparedInput := r.getBufPair()
-			err = r.prepareSingleFetch(ctx, f.Fetches[i], data, set, preparedInput.Data)
+			err = r.prepareSingleFetch(ctx, f, data, set, preparedInput.Data)
 			if err != nil {
 				return err
 			}
 			*preparedInputs = append(*preparedInputs, preparedInput)
+			buf := set.buffers[f.BufferId]
+			resolvers = append(resolvers, func() error {
+				return r.resolveSingleFetch(ctx, f, preparedInput.Data, buf)
+			})
+		case *BatchFetch:
+			preparedInput := r.getBufPair()
+			err = r.prepareSingleFetch(ctx, f.Fetch, data, set, preparedInput.Data)
+			if err != nil {
+				return err
+			}
+			*preparedInputs = append(*preparedInputs, preparedInput)
+			buf := set.buffers[f.Fetch.BufferId]
+			resolvers = append(resolvers, func() error {
+				return r.resolveBatchFetch(ctx, f, preparedInput.Data, buf)
+			})
 		}
-		wg := r.getWaitGroup()
-		defer r.freeWaitGroup(wg)
-		for i := range f.Fetches {
-			preparedInput := (*preparedInputs)[i]
-			singleFetch := f.Fetches[i]
-			buf := set.buffers[f.Fetches[i].BufferId]
-			wg.Add(1)
-			go func(s *SingleFetch, buf *BufPair) {
-				_ = r.resolveSingleFetch(ctx, s, preparedInput.Data, buf)
-				wg.Done()
-			}(singleFetch, buf)
-		}
-		wg.Wait()
 	}
-	return
+
+	for _, resolver := range resolvers {
+		go func(r func() error) {
+			_ = resolver() // @TODO handle error
+			wg.Done()
+		}(resolver)
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 func (r *Resolver) prepareSingleFetch(ctx *Context, fetch *SingleFetch, data []byte, set *resultSet, preparedInput *fastbuffer.FastBuffer) (err error) {
@@ -1087,9 +1161,17 @@ func (r *Resolver) prepareSingleFetch(ctx *Context, fetch *SingleFetch, data []b
 	return
 }
 
+func (r *Resolver) resolveBatchFetch(ctx *Context, fetch *BatchFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
+	dataloader := ctx.getDataLoader(fetch)
+
+	err = dataloader.Load(ctx, preparedInput.Bytes(), buf)
+	fmt.Println("resolveBatchFetch", pathToString(ctx.pathElements), string(buf.Data.Bytes()))
+	return
+}
+
 func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
 	fmt.Printf("\n")
-	fmt.Println("resolve fetch count", pathToString(ctx.pathElements), ctx.refCounter.get(ctx.pathElements))
+	fmt.Println("resolve Fetch count", pathToString(ctx.pathElements), ctx.refCounter.get(ctx.pathElements))
 	fmt.Println("request", string(preparedInput.Bytes()))
 	fmt.Printf("\n")
 
@@ -1403,7 +1485,7 @@ func (_ *SingleFetch) FetchKind() FetchKind {
 }
 
 type ParallelFetch struct {
-	Fetches []*SingleFetch
+	Fetches []Fetch
 }
 
 func (_ *ParallelFetch) FetchKind() FetchKind {
@@ -1411,14 +1493,13 @@ func (_ *ParallelFetch) FetchKind() FetchKind {
 }
 
 type BatchFetch struct {
-	fetch *SingleFetch
-	MergeInputs func(inputs ...[]byte) (*BatchInput, error)
+	Fetch        *SingleFetch
+	PrepareBatch func(inputs ...[]byte) (*BatchInput, error)
 }
 
 func (_ *BatchFetch) FetchKind() FetchKind {
 	return FetchKindBatch
 }
-
 
 type String struct {
 	Path     []string

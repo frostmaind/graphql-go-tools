@@ -1,9 +1,12 @@
 package resolve
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/buger/jsonparser"
+
+	"github.com/jensneuse/graphql-go-tools/pkg/fastbuffer"
 )
 
 type DataLoader struct {
@@ -39,14 +42,16 @@ func (d *DataLoader) Load(ctx *Context, input []byte, bufPair *BufPair) (err err
 		go d.resolveFetch(ctx)
 	}
 
+	fmt.Println("before waiting", d.totalNum)
 	<-d.batch.done
+	fmt.Println("after waiting")
 	err = d.batch.err
 
 	return
 }
 
 func (d *DataLoader) resolveFetch(ctx *Context) {
-	batchInput, err := d.fetch.MergeInputs(d.inputs...)
+	batchInput, err := d.fetch.PrepareBatch(d.inputs...)
 	defer func() { close(d.batch.done) }()
 
 	if err != nil {
@@ -54,35 +59,41 @@ func (d *DataLoader) resolveFetch(ctx *Context) {
 		return
 	}
 
+	fmt.Println("batch request", string(batchInput.Input))
+
+	fmt.Println()
+
 	if ctx.beforeFetchHook != nil {
 		ctx.beforeFetchHook.OnBeforeFetch(d.hookCtx(ctx), batchInput.Input)
 	}
 
-	batchPair := d.resolver.getBufPair()
-	defer d.resolver.freeBufPair(batchPair)
+	batchBufferPair := &BufPair{
+		Data:   fastbuffer.New(),
+		Errors: fastbuffer.New(),
+	}
 
-	if err = d.fetch.fetch.DataSource.Load(ctx.Context, batchInput.Input, batchPair); err != nil {
+	if err = d.fetch.Fetch.DataSource.Load(ctx.Context, batchInput.Input, batchBufferPair); err != nil {
 		d.batch.err = err
 		return
 	}
 
 	if ctx.afterFetchHook != nil {
-		if batchPair.HasData() {
-			ctx.afterFetchHook.OnData(d.hookCtx(ctx), batchPair.Data.Bytes(), false)
+		if batchBufferPair.HasData() {
+			ctx.afterFetchHook.OnData(d.hookCtx(ctx), batchBufferPair.Data.Bytes(), false)
 		}
-		if batchPair.HasErrors() {
-			ctx.afterFetchHook.OnError(d.hookCtx(ctx), batchPair.Errors.Bytes(), false)
+		if batchBufferPair.HasErrors() {
+			ctx.afterFetchHook.OnError(d.hookCtx(ctx), batchBufferPair.Errors.Bytes(), false)
 		}
 	}
 
 	var outPosition int
 
-	_, d.batch.err = jsonparser.ArrayEach(batchPair.Data.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	_, d.batch.err = jsonparser.ArrayEach(batchBufferPair.Data.Bytes(), func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 		inputPositions := batchInput.OutToInPositions[outPosition]
 
-		for i := range inputPositions {
-			bufPair := d.inputPosToBufPairs[i]
-			bufPair.Errors.WriteBytes(batchPair.Errors.Bytes())
+		for _, pos := range inputPositions {
+			bufPair := d.inputPosToBufPairs[pos]
+			bufPair.Errors.WriteBytes(batchBufferPair.Errors.Bytes())
 			bufPair.Data.WriteBytes(value)
 		}
 

@@ -467,9 +467,9 @@ func (v *Visitor) resolveFieldValue(fieldRef, typeRef int, nullable bool, path [
 	case ast.TypeKindList:
 		listItem := v.resolveFieldValue(fieldRef, ofType, true, nil)
 		return &resolve.Array{
-			Nullable: nullable,
-			Path:     path,
-			Item:     listItem,
+			Nullable:            nullable,
+			Path:                path,
+			Item:                listItem,
 			ResolveAsynchronous: true,
 		}
 	case ast.TypeKindNamed:
@@ -739,7 +739,14 @@ func (v *Visitor) configureObjectFetch(config objectFetchConfiguration) {
 	}
 	fetchConfig := config.planner.ConfigureFetch()
 	fetch := v.configureSingleFetch(config, fetchConfig)
-	v.resolveInputTemplates(config, &fetch.Input, &fetch.Variables)
+
+	switch f := fetch.(type) {
+	case *resolve.SingleFetch:
+		v.resolveInputTemplates(config, &f.Input, &f.Variables)
+	case *resolve.BatchFetch:
+		v.resolveInputTemplates(config, &f.Fetch.Input, &f.Fetch.Variables)
+	}
+
 	if config.object.Fetch == nil {
 		config.object.Fetch = fetch
 		return
@@ -748,7 +755,13 @@ func (v *Visitor) configureObjectFetch(config objectFetchConfiguration) {
 	case *resolve.SingleFetch:
 		copyOfExisting := *existing
 		parallel := &resolve.ParallelFetch{
-			Fetches: []*resolve.SingleFetch{&copyOfExisting, fetch},
+			Fetches: []resolve.Fetch{&copyOfExisting, fetch},
+		}
+		config.object.Fetch = parallel
+	case *resolve.BatchFetch:
+		copyOfExisting := *existing
+		parallel := &resolve.ParallelFetch{
+			Fetches: []resolve.Fetch{&copyOfExisting, fetch},
 		}
 		config.object.Fetch = parallel
 	case *resolve.ParallelFetch:
@@ -756,13 +769,22 @@ func (v *Visitor) configureObjectFetch(config objectFetchConfiguration) {
 	}
 }
 
-func (v *Visitor) configureSingleFetch(internal objectFetchConfiguration, external FetchConfiguration) *resolve.SingleFetch {
-	return &resolve.SingleFetch{
+func (v *Visitor) configureSingleFetch(internal objectFetchConfiguration, external FetchConfiguration) resolve.Fetch {
+	singleFetch := &resolve.SingleFetch{
 		BufferId:             internal.bufferID,
 		Input:                external.Input,
 		DataSource:           external.DataSource,
 		Variables:            external.Variables,
 		DisallowSingleFlight: external.DisallowSingleFlight,
+	}
+
+	if !external.BatchFetchConfiguration.Enabled {
+		return singleFetch
+	}
+
+	return &resolve.BatchFetch{
+		Fetch:        singleFetch,
+		PrepareBatch: external.BatchFetchConfiguration.PrepareBatch,
 	}
 }
 
@@ -880,6 +902,12 @@ type FetchConfiguration struct {
 	Variables            resolve.Variables
 	DataSource           resolve.DataSource
 	DisallowSingleFlight bool
+	BatchFetchConfiguration BatchFetchConfiguration
+}
+
+type BatchFetchConfiguration struct {
+	Enabled      bool
+	PrepareBatch func(inputs ...[]byte) (*resolve.BatchInput, error)
 }
 
 type configurationVisitor struct {
