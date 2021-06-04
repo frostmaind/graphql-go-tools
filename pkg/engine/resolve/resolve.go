@@ -211,7 +211,7 @@ type dataLoaders struct {
 // @TODO rewrite work with key
 func (d *dataLoaders) get(key string, fetch *BatchFetch, totalNum int) *DataLoader {
 	d.mux.Lock()
-	d.mux.Unlock()
+	defer d.mux.Unlock()
 
 	if _, ok := d.pathToDataloader[key]; !ok {
 		d.pathToDataloader[key] = NewDataLoader(fetch, totalNum)

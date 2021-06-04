@@ -14,8 +14,7 @@ import (
 )
 
 func (r *queryResolver) TopProducts(ctx context.Context, first *int) ([]*model.Product, error) {
-
-	return hats[:*first], nil
+	return hats, nil
 }
 
 func (r *subscriptionResolver) UpdatedPrice(ctx context.Context) (<-chan *model.Product, error) {
