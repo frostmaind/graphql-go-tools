@@ -6,29 +6,28 @@ package graph
 import (
 	"context"
 
-	"github.com/99designs/gqlgen/example/federation/reviews/graph/model"
-
-	"github.com/jensneuse/federation-example/reviews/graph/generated"
+	"github.com/jensneuse/federation-example/ratings/graph/generated"
+	"github.com/jensneuse/federation-example/ratings/graph/model"
 )
 
-func (r *productResolver) Reviews(ctx context.Context, obj *model.Product) ([]*model.Review, error) {
-	var res []*model.Review
+func (r *productResolver) Ratings(ctx context.Context, obj *model.Product) ([]*model.Rating, error) {
+	var res []*model.Rating
 
-	for _, review := range reviews {
-		if review.Product.Upc == obj.Upc {
-			res = append(res, review)
+	for _, Rating := range Ratings {
+		if Rating.Product.Upc == obj.Upc {
+			res = append(res, Rating)
 		}
 	}
 
 	return res, nil
 }
 
-func (r *userResolver) Reviews(ctx context.Context, obj *model.User) ([]*model.Review, error) {
-	var res []*model.Review
+func (r *userResolver) Ratings(ctx context.Context, obj *model.User) ([]*model.Rating, error) {
+	var res []*model.Rating
 
-	for _, review := range reviews {
-		if review.Author.ID == obj.ID {
-			res = append(res, review)
+	for _, Rating := range Ratings {
+		if Rating.Author.ID == obj.ID {
+			res = append(res, Rating)
 		}
 	}
 
@@ -43,4 +42,3 @@ func (r *Resolver) User() generated.UserResolver { return &userResolver{r} }
 
 type productResolver struct{ *Resolver }
 type userResolver struct{ *Resolver }
-

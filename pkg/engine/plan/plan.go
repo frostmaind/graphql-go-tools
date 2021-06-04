@@ -470,6 +470,7 @@ func (v *Visitor) resolveFieldValue(fieldRef, typeRef int, nullable bool, path [
 			Nullable:            nullable,
 			Path:                path,
 			Item:                listItem,
+			// @TODO delete hardcode
 			ResolveAsynchronous: true,
 		}
 	case ast.TypeKindNamed:

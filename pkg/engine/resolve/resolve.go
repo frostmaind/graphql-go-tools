@@ -1161,20 +1161,11 @@ func (r *Resolver) prepareSingleFetch(ctx *Context, fetch *SingleFetch, data []b
 	return
 }
 
-func (r *Resolver) resolveBatchFetch(ctx *Context, fetch *BatchFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
-	dataloader := ctx.getDataLoader(fetch)
-
-	err = dataloader.Load(ctx, preparedInput.Bytes(), buf)
-	fmt.Println("resolveBatchFetch", pathToString(ctx.pathElements), string(buf.Data.Bytes()))
-	return
+func (r *Resolver) resolveBatchFetch(ctx *Context, fetch *BatchFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) error {
+	return ctx.getDataLoader(fetch).Load(ctx, preparedInput.Bytes(), buf)
 }
 
 func (r *Resolver) resolveSingleFetch(ctx *Context, fetch *SingleFetch, preparedInput *fastbuffer.FastBuffer, buf *BufPair) (err error) {
-	fmt.Printf("\n")
-	fmt.Println("resolve Fetch count", pathToString(ctx.pathElements), ctx.refCounter.get(ctx.pathElements))
-	fmt.Println("request", string(preparedInput.Bytes()))
-	fmt.Printf("\n")
-
 	if ctx.beforeFetchHook != nil {
 		ctx.beforeFetchHook.OnBeforeFetch(r.hookCtx(ctx), preparedInput.Bytes())
 	}

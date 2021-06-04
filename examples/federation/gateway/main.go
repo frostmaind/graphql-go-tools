@@ -54,6 +54,7 @@ func startServer() {
 			{Name: "accounts", URL: "http://localhost:4001/query"},
 			{Name: "products", URL: "http://localhost:4002/query", WS: "ws://localhost:4002/query"},
 			{Name: "reviews", URL: "http://localhost:4003/query"},
+			{Name: "ratings", URL: "http://localhost:4004/query"},
 		},
 		PollingInterval: 30 * time.Second,
 	})

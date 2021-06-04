@@ -1,0 +1,15 @@
+type Rating {
+    rating: Int!
+    author: User!
+    product: Product!
+}
+
+extend type User @key(fields: "id") {
+    id: ID! @external
+    ratings: [Rating]
+}
+
+extend type Product @key(fields: "upc") {
+    upc: String! @external
+    ratings: [Rating]
+}

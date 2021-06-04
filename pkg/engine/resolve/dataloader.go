@@ -14,7 +14,6 @@ type DataLoader struct {
 	inputs             [][]byte
 	inputPosToBufPairs map[int]*BufPair
 	fetch              *BatchFetch
-	resolver           *Resolver
 
 	batch *batch
 
