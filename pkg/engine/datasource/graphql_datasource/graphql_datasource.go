@@ -884,13 +884,14 @@ var (
 		{"locations"},
 		{"path"},
 	}
-	entitiesPath     = []string{"_entities", "[0]"}
+	entitiesPath     = []string{"_entities"}
 	uniqueIdentifier = []byte(UniqueIdentifier)
 )
 
 type Source struct {
 	client httpclient.Client
 }
+
 
 func (s *Source) Load(ctx context.Context, input []byte, bufPair *resolve.BufPair) (err error) {
 	buf := pool.BytesBuffer.Get()

@@ -68,6 +68,7 @@ const (
 
 	FetchKindSingle FetchKind = iota + 1
 	FetchKindParallel
+	FetchKindBatch
 )
 
 type HookContext struct {
@@ -296,6 +297,11 @@ func newRefCount() *refCounter {
 		pathToChildReadiness: make(map[string]map[string]pathReadinessState, 50),
 		mux:                  &sync.Mutex{},
 	}
+}
+
+type BatchInput struct {
+	Input            []byte
+	OutToInPositions map[int][]int
 }
 
 type Fetch interface {
@@ -1403,6 +1409,16 @@ type ParallelFetch struct {
 func (_ *ParallelFetch) FetchKind() FetchKind {
 	return FetchKindParallel
 }
+
+type BatchFetch struct {
+	fetch *SingleFetch
+	MergeInputs func(inputs ...[]byte) (*BatchInput, error)
+}
+
+func (_ *BatchFetch) FetchKind() FetchKind {
+	return FetchKindBatch
+}
+
 
 type String struct {
 	Path     []string
