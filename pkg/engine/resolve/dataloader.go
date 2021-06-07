@@ -37,14 +37,18 @@ func (d *DataLoader) Load(ctx *Context, input []byte, bufPair *BufPair) (err err
 
 	d.mu.Unlock()
 
-	if currentPosition == (d.totalNum - 1) { // The last element of the batch
+	if d.isBatchReady(currentPosition) {
 		go d.resolveFetch(ctx)
 	}
 
 	fmt.Println("before waiting", d.totalNum)
-	<-d.batch.done
+	select {
+	case <-d.batch.done:
+		err = d.batch.err
+	case <- ctx.Context.Done():
+		err = ctx.Context.Err()
+	}
 	fmt.Println("after waiting")
-	err = d.batch.err
 
 	return
 }
@@ -100,6 +104,10 @@ func (d *DataLoader) resolveFetch(ctx *Context) {
 	})
 
 	return
+}
+
+func (d *DataLoader) isBatchReady(currentPosition int) bool {
+	return currentPosition == (d.totalNum - 1)
 }
 
 func (d *DataLoader) hookCtx(ctx *Context) HookContext {

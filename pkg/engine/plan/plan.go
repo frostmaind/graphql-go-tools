@@ -739,7 +739,7 @@ func (v *Visitor) configureObjectFetch(config objectFetchConfiguration) {
 		return
 	}
 	fetchConfig := config.planner.ConfigureFetch()
-	fetch := v.configureSingleFetch(config, fetchConfig)
+	fetch := v.configureFetch(config, fetchConfig)
 
 	switch f := fetch.(type) {
 	case *resolve.SingleFetch:
@@ -770,7 +770,7 @@ func (v *Visitor) configureObjectFetch(config objectFetchConfiguration) {
 	}
 }
 
-func (v *Visitor) configureSingleFetch(internal objectFetchConfiguration, external FetchConfiguration) resolve.Fetch {
+func (v *Visitor) configureFetch(internal objectFetchConfiguration, external FetchConfiguration) resolve.Fetch {
 	singleFetch := &resolve.SingleFetch{
 		BufferId:             internal.bufferID,
 		Input:                external.Input,

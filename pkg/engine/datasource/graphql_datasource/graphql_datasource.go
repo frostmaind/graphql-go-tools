@@ -42,6 +42,7 @@ type Planner struct {
 	hasFederationRoot          bool
 	extractEntities            bool
 	client                     httpclient.Client
+	batchMerger                *batchMerger
 	isNested                   bool   // isNested - flags that datasource is nested e.g. field with datasource is not on a query type
 	rootTypeName               string // rootTypeName - holds name of top level type
 	rootFieldName              string // rootFieldName - holds name of root type field
@@ -161,7 +162,7 @@ func (p *Planner) ConfigureFetch() plan.FetchConfiguration {
 		DisallowSingleFlight: p.disallowSingleFlight,
 		BatchFetchConfiguration: plan.BatchFetchConfiguration{
 			Enabled:      p.extractEntities,
-			PrepareBatch: mergeFederationInputs,
+			PrepareBatch: p.batchMerger.merge,
 		},
 	}
 }
@@ -873,8 +874,9 @@ type Factory struct {
 func (f *Factory) Planner() plan.DataSourcePlanner {
 	f.id++
 	return &Planner{
-		id:     strconv.Itoa(f.id),
-		client: f.Client,
+		id:          strconv.Itoa(f.id),
+		client:      f.Client,
+		batchMerger: newBatchMerger(),
 	}
 }
 
