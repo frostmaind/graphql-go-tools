@@ -5,12 +5,16 @@ package graph
 
 import (
 	"context"
+	"errors"
 
 	"github.com/99designs/gqlgen/example/federation/products/graph/model"
 	"github.com/jensneuse/federation-example/products/graph/generated"
 )
 
 func (r *entityResolver) FindProductByUpc(ctx context.Context, upc string) (*model.Product, error) {
+	if upc == "top-3" {
+		return nil, errors.New("some custom error")
+	}
 	for _, h := range hats {
 		if h.Upc == upc {
 			return h, nil
