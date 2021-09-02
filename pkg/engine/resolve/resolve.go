@@ -67,7 +67,7 @@ var (
 		{"path"},
 		{"extensions"},
 	}
-	entitiesPath = []string{"_entities", "[0]"}
+	entitiesPath = []string{"_entities"}
 )
 
 const (

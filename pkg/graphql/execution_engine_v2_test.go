@@ -842,6 +842,7 @@ func newFederationEngine(ctx context.Context, setup *federationSetup, enableData
 			},
 		}),
 		Factory: &graphql_datasource.Factory{
+			BatchFactory: graphql_datasource.NewBatchFactory(),
 			HTTPClient: httpclient.DefaultNetHttpClient,
 		},
 	}
@@ -885,6 +886,7 @@ func newFederationEngine(ctx context.Context, setup *federationSetup, enableData
 			},
 		}),
 		Factory: &graphql_datasource.Factory{
+			BatchFactory: graphql_datasource.NewBatchFactory(),
 			HTTPClient: httpclient.DefaultNetHttpClient,
 		},
 	}
@@ -928,6 +930,7 @@ func newFederationEngine(ctx context.Context, setup *federationSetup, enableData
 			},
 		}),
 		Factory: &graphql_datasource.Factory{
+			BatchFactory: graphql_datasource.NewBatchFactory(),
 			HTTPClient: httpclient.DefaultNetHttpClient,
 		},
 	}
