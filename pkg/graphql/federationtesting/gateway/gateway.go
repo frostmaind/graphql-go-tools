@@ -1,4 +1,4 @@
-package main
+package gateway
 
 import (
 	"context"
@@ -69,9 +69,10 @@ func (g *Gateway) Ready() {
 	<-g.readyCh
 }
 
+// Error handling is not finished.
 func (g *Gateway) UpdateDataSources(newDataSourcesConfig []graphqlDataSource.Configuration) {
 	ctx := context.Background()
-	engineConfigFactory := graphql.NewFederationEngineConfigFactory(newDataSourcesConfig,graphqlDataSource.NewBatchFactory(), graphql.WithFederationHttpClient(g.httpClient))
+	engineConfigFactory := graphql.NewFederationEngineConfigFactory(newDataSourcesConfig, graphqlDataSource.NewBatchFactory(), graphql.WithFederationHttpClient(g.httpClient))
 
 	schema, err := engineConfigFactory.MergedSchema()
 	if err != nil {

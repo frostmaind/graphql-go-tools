@@ -705,6 +705,10 @@ func (r *Resolver) resolveEmptyObject(b *fastbuffer.FastBuffer) {
 }
 
 func (r *Resolver) resolveArray(ctx *Context, array *Array, data []byte, arrayBuf *BufPair) (err error) {
+	if len(array.Path) != 0 {
+		data, _, _, _ = jsonparser.Get(data, array.Path...)
+	}
+
 	if bytes.Equal(data, emptyArray) {
 		r.resolveEmptyArray(arrayBuf.Data)
 		return
@@ -718,7 +722,7 @@ func (r *Resolver) resolveArray(ctx *Context, array *Array, data []byte, arrayBu
 
 	_, err = jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 		*arrayItems = append(*arrayItems, value)
-	}, array.Path...)
+	})
 
 	if len(*arrayItems) == 0 {
 		if !array.Nullable {
@@ -1076,7 +1080,7 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 		r.MergeBufPairs(fieldBuf, objectBuf, false)
 	}
 	if first {
-		if typeNameSkip {
+		if typeNameSkip && !object.Nullable {
 			return errTypeNameSkipped
 		}
 		if !object.Nullable {

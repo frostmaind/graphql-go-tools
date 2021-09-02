@@ -18,9 +18,4 @@ ACCOUNTS_PID=$!
 /tmp/srv-products &
 PRODUCTS_PID=$!
 
-/tmp/srv-reviews &
-REVIEWS_PID=$!
-
-sleep 1
-
-/tmp/srv-gateway
+/tmp/srv-reviews
