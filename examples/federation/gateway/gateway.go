@@ -10,6 +10,7 @@ import (
 
 	graphqlDataSource "github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/graphql"
+
 	"github.com/jensneuse/graphql-go-tools/examples/federation/gateway/authorization"
 )
 
@@ -54,12 +55,12 @@ type Gateway struct {
 	gqlHandlerFactory HandlerFactory
 	httpClient        *http.Client
 	logger            log.Logger
-	currentRoles []string
+	currentRoles      []string
 
 	gqlHandler http.Handler
 
-	mu         *sync.Mutex
-	readyCh   chan struct{}
+	mu      *sync.Mutex
+	readyCh chan struct{}
 
 	readyOnce *sync.Once
 }
@@ -78,7 +79,7 @@ func (g *Gateway) Ready() {
 
 func (g *Gateway) UpdateDataSources(newDataSourcesConfig []graphqlDataSource.Configuration) {
 	ctx := context.Background()
-	engineConfigFactory := graphql.NewFederationEngineConfigFactory(newDataSourcesConfig,graphqlDataSource.NewBatchFactory(), graphql.WithFederationHttpClient(g.httpClient))
+	engineConfigFactory := graphql.NewFederationEngineConfigFactory(newDataSourcesConfig, graphqlDataSource.NewBatchFactory(), graphql.WithFederationHttpClient(g.httpClient))
 
 	schema, err := engineConfigFactory.MergedSchema()
 	if err != nil {
@@ -93,7 +94,7 @@ func (g *Gateway) UpdateDataSources(newDataSourcesConfig []graphqlDataSource.Con
 	}
 
 	if !res.Valid {
-		for i:= 0; i < res.Errors.Count(); i++ {
+		for i := 0; i < res.Errors.Count(); i++ {
 			g.logger.Info("validate error", log.Error(res.Errors.ErrorByIndex(i)))
 		}
 	}
