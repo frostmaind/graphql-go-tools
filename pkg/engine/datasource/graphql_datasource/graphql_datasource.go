@@ -366,13 +366,14 @@ func (p *Planner) addRepresentationsVariable() {
 		p.visitor.Walker.StopWithInternalErr(fmt.Errorf("GraphQL Planner: failed parsing Federation SDL"))
 		return
 	}
-	directive := -1
+
+	var directiveRefs []int
+
 	for i := range doc.ObjectTypeExtensions {
 		if p.lastFieldEnclosingTypeName == doc.ObjectTypeExtensionNameString(i) {
 			for _, j := range doc.ObjectTypeExtensions[i].Directives.Refs {
 				if doc.DirectiveNameString(j) == "key" {
-					directive = j
-					break
+					directiveRefs = append(directiveRefs, j)
 				}
 			}
 			break
@@ -382,25 +383,36 @@ func (p *Planner) addRepresentationsVariable() {
 		if p.lastFieldEnclosingTypeName == doc.ObjectTypeDefinitionNameString(i) {
 			for _, j := range doc.ObjectTypeDefinitions[i].Directives.Refs {
 				if doc.DirectiveNameString(j) == "key" {
-					directive = j
-					break
+					directiveRefs = append(directiveRefs, j)
 				}
 			}
 			break
 		}
 	}
-	if directive == -1 {
+
+	if len(directiveRefs) == 0 {
 		return
 	}
-	value, exists := doc.DirectiveArgumentValueByName(directive, []byte("fields"))
-	if !exists {
+
+	var fields []string
+
+	for _, directiveRef := range directiveRefs {
+		value, exists := doc.DirectiveArgumentValueByName(directiveRef, []byte("fields"))
+		if !exists {
+			continue
+		}
+		if value.Kind != ast.ValueKindString {
+			continue
+		}
+
+		fieldsStr := doc.StringValueContentString(value.Ref)
+		fields = append(fields, strings.Split(fieldsStr, " ")...)
+	}
+
+	if len(fields) == 0 {
 		return
 	}
-	if value.Kind != ast.ValueKindString {
-		return
-	}
-	fieldsStr := doc.StringValueContentString(value.Ref)
-	fields := strings.Split(fieldsStr, " ")
+
 	representationsJson, _ := sjson.SetRawBytes(nil, "__typename", []byte("\""+p.lastFieldEnclosingTypeName+"\""))
 	for i := range fields {
 		variable, exists := p.variables.AddVariable(&resolve.ObjectVariable{
