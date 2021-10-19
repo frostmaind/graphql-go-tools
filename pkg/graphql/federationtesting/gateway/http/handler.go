@@ -54,7 +54,7 @@ func (g *GraphQLHTTPRequestHandler) upgradeWithNewGoroutine(w http.ResponseWrite
 	if err != nil {
 		return err
 	}
-	g.handleWebsocket(r.Context(), conn)
+	g.handleWebsocket(r.Context(), conn, r.Header)
 	return nil
 }
 

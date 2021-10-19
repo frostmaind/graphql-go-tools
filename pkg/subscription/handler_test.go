@@ -812,7 +812,7 @@ func setupEngineV2(t *testing.T, ctx context.Context, chatServerURL string) (*Ex
 	engine, err := graphql.NewExecutionEngineV2(ctx, abstractlogger.NoopLogger, engineConf)
 	require.NoError(t, err)
 
-	executorPool := NewExecutorV2Pool(engine, hookHolder.reqCtx)
+	executorPool := NewExecutorV2Pool(engine, hookHolder.reqCtx, nil)
 
 	return executorPool, hookHolder
 }

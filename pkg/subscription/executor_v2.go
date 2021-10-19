@@ -3,6 +3,7 @@ package subscription
 import (
 	"bytes"
 	"context"
+	"net/http"
 	"sync"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
@@ -12,14 +13,16 @@ import (
 
 // ExecutorV2Pool - provides reusable executors
 type ExecutorV2Pool struct {
+	headers              http.Header
 	engine               *graphql.ExecutionEngineV2
 	executorPool         *sync.Pool
 	connectionInitReqCtx context.Context // connectionInitReqCtx - holds original request context used to establish websocket connection
 }
 
-func NewExecutorV2Pool(engine *graphql.ExecutionEngineV2, connectionInitReqCtx context.Context) *ExecutorV2Pool {
+func NewExecutorV2Pool(engine *graphql.ExecutionEngineV2, connectionInitReqCtx context.Context, headers http.Header) *ExecutorV2Pool {
 	return &ExecutorV2Pool{
-		engine: engine,
+		headers: headers,
+		engine:  engine,
 		executorPool: &sync.Pool{
 			New: func() interface{} {
 				return &ExecutorV2{}
@@ -34,6 +37,10 @@ func (e *ExecutorV2Pool) Get(payload []byte) (Executor, error) {
 	err := graphql.UnmarshalRequest(bytes.NewReader(payload), &operation)
 	if err != nil {
 		return nil, err
+	}
+
+	if e.headers != nil {
+		operation.SetHeader(e.headers)
 	}
 
 	return &ExecutorV2{

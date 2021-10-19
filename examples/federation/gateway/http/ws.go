@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"net/http"
 
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
@@ -144,10 +145,10 @@ func HandleWebsocket(done chan bool, errChan chan error, conn net.Conn, executor
 }
 
 // handleWebsocket will handle the websocket connection.
-func (g *GraphQLHTTPRequestHandler) handleWebsocket(connInitReqCtx context.Context, conn net.Conn) {
+func (g *GraphQLHTTPRequestHandler) handleWebsocket(connInitReqCtx context.Context, conn net.Conn, headers http.Header) {
 	done := make(chan bool)
 	errChan := make(chan error)
-	executorPool := subscription.NewExecutorV2Pool(g.engine, connInitReqCtx)
+	executorPool := subscription.NewExecutorV2Pool(g.engine, connInitReqCtx, headers)
 
 	go HandleWebsocket(done, errChan, conn, executorPool, g.log)
 	select {
