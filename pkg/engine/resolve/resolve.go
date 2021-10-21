@@ -1424,6 +1424,7 @@ const (
 	VariableSourceObject VariableSource = iota + 1
 	VariableSourceContext
 	VariableSourceRequestHeader
+	VariableSourceOperationContext
 )
 
 type TemplateSegment struct {
@@ -1553,6 +1554,7 @@ const (
 	VariableKindContext VariableKind = iota + 1
 	VariableKindObject
 	VariableKindHeader
+	VariableKindOperationContext
 )
 
 type ContextVariable struct {
@@ -1660,6 +1662,45 @@ func (h *HeaderVariable) Equals(another Variable) bool {
 		}
 	}
 	return true
+}
+
+type OperationContextVariable struct {
+	Path []string
+}
+
+func (o *OperationContextVariable) TemplateSegment() TemplateSegment {
+	return TemplateSegment{
+		SegmentType: VariableSegmentType,
+		VariableSource: VariableSourceOperationContext,
+		VariableSourcePath: o.Path,
+	}
+}
+
+func (o *OperationContextVariable) Equals(another Variable) bool {
+	if another == nil {
+		return false
+	}
+
+	if another.VariableKind() != o.VariableKind() {
+		return false
+	}
+
+	anotherObjectContextVariable := another.(*OperationContextVariable)
+	if len(o.Path) != len(anotherObjectContextVariable.Path) {
+		return false
+	}
+
+	for i:= range o.Path {
+		if o.Path[i] != anotherObjectContextVariable.Path[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (o *OperationContextVariable) VariableKind() VariableKind {
+	return VariableKindOperationContext
 }
 
 type GraphQLSubscription struct {
