@@ -52,6 +52,7 @@ var (
 	errNonNullableFieldValueIsNull = errors.New("non Nullable field value is null")
 	errTypeNameSkipped             = errors.New("skipped because of __typename condition")
 	errHeaderPathInvalid           = errors.New("invalid header path: header variables must be of this format: .request.header.{{ key }} ")
+	errOperationContextPathInvalid = errors.New("invalid context path: context variables must be of this format: .context.{{ key }} ")
 
 	ErrUnableToResolve = errors.New("unable to resolve operation")
 )
@@ -1303,6 +1304,8 @@ func (i *InputTemplate) Render(ctx *Context, data []byte, preparedInput *fastbuf
 				err = i.renderContextVariable(ctx, i.Segments[j].VariableSourcePath, i.Segments[j].RenderAsGraphQLValue, preparedInput)
 			case VariableSourceRequestHeader:
 				err = i.renderHeaderVariable(ctx, i.Segments[j].VariableSourcePath, preparedInput)
+			case VariableSourceOperationContext:
+				err = i.renderOperationContextVariable(ctx.Context, i.Segments[j].VariableSourcePath, preparedInput)
 			default:
 				err = fmt.Errorf("InputTemplate.Render: cannot resolve variable of kind: %d", i.Segments[j].VariableSource)
 			}
@@ -1411,6 +1414,34 @@ func (i *InputTemplate) renderHeaderVariable(ctx *Context, path []string, prepar
 		}
 		preparedInput.WriteString(value[j])
 	}
+	return nil
+}
+
+func (i *InputTemplate) renderOperationContextVariable(ctx context.Context, path []string, preparedInput *fastbuffer.FastBuffer) error {
+	if len(path) != 1 {
+		return errOperationContextPathInvalid
+	}
+
+	contextKey := path[0]
+
+	value := ctx.Value(contextKey)
+	if value == nil {
+		return nil
+	}
+
+	var strVal string
+
+	switch s := value.(type) {
+	case fmt.Stringer:
+		strVal = s.String()
+	case string:
+		strVal = s
+	default:
+		strVal = fmt.Sprintf("%v", s)
+	}
+
+	preparedInput.WriteString(strVal)
+
 	return nil
 }
 
@@ -1670,8 +1701,8 @@ type OperationContextVariable struct {
 
 func (o *OperationContextVariable) TemplateSegment() TemplateSegment {
 	return TemplateSegment{
-		SegmentType: VariableSegmentType,
-		VariableSource: VariableSourceOperationContext,
+		SegmentType:        VariableSegmentType,
+		VariableSource:     VariableSourceOperationContext,
 		VariableSourcePath: o.Path,
 	}
 }
@@ -1690,7 +1721,7 @@ func (o *OperationContextVariable) Equals(another Variable) bool {
 		return false
 	}
 
-	for i:= range o.Path {
+	for i := range o.Path {
 		if o.Path[i] != anotherObjectContextVariable.Path[i] {
 			return false
 		}
