@@ -15,15 +15,12 @@ import (
 	"nhooyr.io/websocket"
 )
 
-var (
-	connectionInitMessage = []byte(`{"type":"connection_init"}`)
-)
-
 const (
-	startMessage    = `{"type":"start","id":"%s","payload":%s}`
-	stopMessage     = `{"type":"stop","id":"%s"}`
-	internalError   = `{"errors":[{"message":"connection error"}]}`
-	connectionError = `{"errors":[{"message":"connection error"}]}`
+	connectionInitMessage = `{"type":"connection_init","payload":%s}`
+	startMessage          = `{"type":"start","id":"%s","payload":%s}`
+	stopMessage           = `{"type":"stop","id":"%s"}`
+	internalError         = `{"errors":[{"message":"connection error"}]}`
+	connectionError       = `{"errors":[{"message":"connection error"}]}`
 )
 
 // WebSocketGraphQLSubscriptionClient is a WebSocket client that allows running multiple subscriptions via the same WebSocket Connection
@@ -112,6 +109,12 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	if options.Header == nil {
 		options.Header = http.Header{}
 	}
+
+	initialPayload, err := json.Marshal(options.Header)
+	if err != nil {
+		return err
+	}
+
 	options.Header.Set("Sec-WebSocket-Protocol", "graphql-ws")
 	options.Header.Set("Sec-WebSocket-Version", "13")
 
@@ -128,7 +131,8 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 		return fmt.Errorf("upgrade unsuccessful")
 	}
 	// init + ack
-	err = conn.Write(ctx, websocket.MessageText, connectionInitMessage)
+	initialMessage := fmt.Sprintf(connectionInitMessage, string(initialPayload))
+	err = conn.Write(ctx, websocket.MessageText, []byte(initialMessage))
 	if err != nil {
 		return err
 	}
