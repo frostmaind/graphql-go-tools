@@ -35,6 +35,7 @@ type WebSocketGraphQLSubscriptionClient struct {
 	handlersMu sync.Mutex
 
 	readTimeout time.Duration
+	readLimit   int64
 }
 
 type Options func(options *opts)
@@ -51,9 +52,16 @@ func WithReadTimeout(timeout time.Duration) Options {
 	}
 }
 
+func WithReadLimit(limit int64) Options {
+	return func(options *opts) {
+		options.readLimit = limit
+	}
+}
+
 type opts struct {
 	readTimeout time.Duration
 	log         abstractlogger.Logger
+	readLimit   int64
 }
 
 func NewWebSocketGraphQLSubscriptionClient(httpClient *http.Client, ctx context.Context, options ...Options) *WebSocketGraphQLSubscriptionClient {
@@ -70,6 +78,7 @@ func NewWebSocketGraphQLSubscriptionClient(httpClient *http.Client, ctx context.
 		handlers:    map[uint64]*connectionHandler{},
 		log:         op.log,
 		readTimeout: op.readTimeout,
+		readLimit:   op.readLimit,
 		hashPool: sync.Pool{
 			New: func() interface{} {
 				return xxhash.New64()
@@ -130,8 +139,13 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	if upgradeResponse.StatusCode != http.StatusSwitchingProtocols {
 		return fmt.Errorf("upgrade unsuccessful")
 	}
+
+	if c.readLimit != 0 {
+		conn.SetReadLimit(c.readLimit)
+	}
+
 	// init + ack
-	initialMessage := fmt.Sprintf(connectionInitMessage, string(initialPayload))
+		initialMessage := fmt.Sprintf(connectionInitMessage, string(initialPayload))
 	err = conn.Write(ctx, websocket.MessageText, []byte(initialMessage))
 	if err != nil {
 		return err
