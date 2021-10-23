@@ -889,7 +889,7 @@ type Factory struct {
 
 func (f *Factory) Planner(ctx context.Context) plan.DataSourcePlanner {
 	if f.wsClient == nil {
-		f.wsClient = NewWebSocketGraphQLSubscriptionClient(f.HTTPClient, ctx)
+		f.wsClient = NewWebSocketGraphQLSubscriptionClient(f.HTTPClient, ctx, WithReadLimit(3276800))
 	}
 	return &Planner{
 		batchFactory: f.BatchFactory,
