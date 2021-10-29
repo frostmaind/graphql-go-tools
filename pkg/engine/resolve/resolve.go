@@ -392,6 +392,12 @@ func New(ctx context.Context, fetcher *Fetcher, enableDataLoader bool) *Resolver
 }
 
 func (r *Resolver) resolveNode(ctx *Context, node Node, data []byte, bufPair *BufPair) (err error) {
+	defer func() {
+		if err != nil {
+			fmt.Errorf(">>>>>>>", ctx.pathElements)
+		}
+	}()
+
 	switch n := node.(type) {
 	case *Object:
 		return r.resolveObject(ctx, n, data, bufPair)
@@ -902,7 +908,7 @@ func (r *Resolver) resolveString(str *String, data []byte, stringBuf *BufPair) e
 	)
 	if len(data) != 0 && str.Path == nil {
 		_, valueType, _, _ = jsonparser.Get(data)
-		if valueType == jsonparser.String || unicode.IsLetter(rune(data[0])) {
+		if (valueType == jsonparser.String || valueType == jsonparser.Number) || unicode.IsLetter(rune(data[0])) {
 			value = data
 		} else if !str.Nullable {
 			return errNonNullableFieldValueIsNull
@@ -913,7 +919,7 @@ func (r *Resolver) resolveString(str *String, data []byte, stringBuf *BufPair) e
 	}
 	if value == nil {
 		value, valueType, _, err = jsonparser.Get(data, str.Path...)
-		if err != nil || valueType != jsonparser.String {
+		if err != nil || (valueType == jsonparser.String || valueType == jsonparser.Number) {
 			if !str.Nullable {
 				return errNonNullableFieldValueIsNull
 			}
@@ -1330,6 +1336,7 @@ func (i *InputTemplate) renderContextVariable(ctx *Context, path []string, rende
 	value, valueType, _, err := jsonparser.Get(ctx.Variables, path...)
 	if err != nil {
 		if err == jsonparser.KeyPathNotFoundError {
+			preparedInput.WriteBytes(literal.NULL)
 			return nil
 		}
 
