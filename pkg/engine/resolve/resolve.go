@@ -1330,7 +1330,6 @@ func (i *InputTemplate) renderContextVariable(ctx *Context, path []string, rende
 	value, valueType, _, err := jsonparser.Get(ctx.Variables, path...)
 	if err != nil {
 		if err == jsonparser.KeyPathNotFoundError {
-			preparedInput.WriteBytes(literal.NULL)
 			return nil
 		}
 
