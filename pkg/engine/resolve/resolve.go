@@ -1329,6 +1329,11 @@ func (i *InputTemplate) renderObjectVariable(data []byte, path []string, prepare
 func (i *InputTemplate) renderContextVariable(ctx *Context, path []string, renderAsGraphQLValue bool, preparedInput *fastbuffer.FastBuffer) error {
 	value, valueType, _, err := jsonparser.Get(ctx.Variables, path...)
 	if err != nil {
+		if err == jsonparser.KeyPathNotFoundError {
+			preparedInput.WriteBytes(literal.NULL)
+			return nil
+		}
+
 		return err
 	}
 	if !renderAsGraphQLValue {
