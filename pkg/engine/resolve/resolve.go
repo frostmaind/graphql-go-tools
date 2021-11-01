@@ -392,12 +392,6 @@ func New(ctx context.Context, fetcher *Fetcher, enableDataLoader bool) *Resolver
 }
 
 func (r *Resolver) resolveNode(ctx *Context, node Node, data []byte, bufPair *BufPair) (err error) {
-	defer func() {
-		if err != nil {
-			fmt.Errorf(">>>>>>> %v\n", ctx.pathElements)
-		}
-	}()
-
 	switch n := node.(type) {
 	case *Object:
 		return r.resolveObject(ctx, n, data, bufPair)
