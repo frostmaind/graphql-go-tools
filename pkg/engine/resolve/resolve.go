@@ -394,7 +394,7 @@ func New(ctx context.Context, fetcher *Fetcher, enableDataLoader bool) *Resolver
 func (r *Resolver) resolveNode(ctx *Context, node Node, data []byte, bufPair *BufPair) (err error) {
 	defer func() {
 		if err != nil {
-			fmt.Errorf(">>>>>>>", ctx.pathElements)
+			fmt.Errorf(">>>>>>> %v\n", ctx.pathElements)
 		}
 	}()
 
@@ -919,7 +919,7 @@ func (r *Resolver) resolveString(str *String, data []byte, stringBuf *BufPair) e
 	}
 	if value == nil {
 		value, valueType, _, err = jsonparser.Get(data, str.Path...)
-		if err != nil || (valueType != jsonparser.String || valueType != jsonparser.Number) {
+		if err != nil || !(valueType == jsonparser.String || valueType == jsonparser.Number) {
 			if !str.Nullable {
 				return errNonNullableFieldValueIsNull
 			}
