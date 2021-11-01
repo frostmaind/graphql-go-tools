@@ -919,7 +919,7 @@ func (r *Resolver) resolveString(str *String, data []byte, stringBuf *BufPair) e
 	}
 	if value == nil {
 		value, valueType, _, err = jsonparser.Get(data, str.Path...)
-		if err != nil || (valueType == jsonparser.String || valueType == jsonparser.Number) {
+		if err != nil || (valueType != jsonparser.String || valueType != jsonparser.Number) {
 			if !str.Nullable {
 				return errNonNullableFieldValueIsNull
 			}
