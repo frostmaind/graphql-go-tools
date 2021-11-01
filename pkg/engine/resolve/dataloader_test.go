@@ -192,7 +192,7 @@ func TestDataLoader_Load(t *testing.T) {
 				InputTemplate: InputTemplate{
 					Segments: []TemplateSegment{
 						{
-							Data:        []byte(`{"method":"POST","url":"http://localhost:4001","body":{"query":"query($userId: ID!){user(id: $userId){ id name }","variables":{"$userId":`),
+							Data:        []byte(`{"method":"POST","url":"http://localhost:4001","body":{"query":"query($userId: ID!){user(id: $userId){ id name }","variables":{"$userId":"`),
 							SegmentType: StaticSegmentType,
 						},
 						{
@@ -201,7 +201,7 @@ func TestDataLoader_Load(t *testing.T) {
 							VariableSourcePath: []string{"id"},
 						},
 						{
-							Data:        []byte(`}}`),
+							Data:        []byte(`"}}`),
 							SegmentType: StaticSegmentType,
 						},
 					},

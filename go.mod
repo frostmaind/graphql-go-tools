@@ -17,6 +17,7 @@ require (
 	github.com/gobwas/ws v1.0.4
 	github.com/golang/mock v1.4.1
 	github.com/gorilla/websocket v1.4.2
+	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/jensneuse/abstractlogger v0.0.4
