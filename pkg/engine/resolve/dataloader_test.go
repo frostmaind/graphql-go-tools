@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/buger/jsonparser"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -140,6 +141,7 @@ func TestDataLoader_Load(t *testing.T) {
 						SegmentType:        VariableSegmentType,
 						VariableSource:     VariableSourceObject,
 						VariableSourcePath: []string{"id"},
+						VariableValueType:  jsonparser.Number,
 					},
 					{
 						Data:        []byte(`}}`),
@@ -192,16 +194,17 @@ func TestDataLoader_Load(t *testing.T) {
 				InputTemplate: InputTemplate{
 					Segments: []TemplateSegment{
 						{
-							Data:        []byte(`{"method":"POST","url":"http://localhost:4001","body":{"query":"query($userId: ID!){user(id: $userId){ id name }","variables":{"$userId":"`),
+							Data:        []byte(`{"method":"POST","url":"http://localhost:4001","body":{"query":"query($userId: ID!){user(id: $userId){ id name }","variables":{"$userId":`),
 							SegmentType: StaticSegmentType,
 						},
 						{
 							SegmentType:        VariableSegmentType,
 							VariableSource:     VariableSourceObject,
 							VariableSourcePath: []string{"id"},
+							VariableValueType:  jsonparser.Number,
 						},
 						{
-							Data:        []byte(`"}}`),
+							Data:        []byte(`}}`),
 							SegmentType: StaticSegmentType,
 						},
 					},
@@ -362,6 +365,7 @@ func TestDataLoader_Load(t *testing.T) {
 						SegmentType:        VariableSegmentType,
 						VariableSource:     VariableSourceObject,
 						VariableSourcePath: []string{"id"},
+						VariableValueType: jsonparser.Number,
 					},
 					{
 						Data:        []byte(`}}`),
@@ -417,6 +421,7 @@ func TestDataLoader_Load(t *testing.T) {
 						SegmentType:        VariableSegmentType,
 						VariableSource:     VariableSourceObject,
 						VariableSourcePath: []string{"id"},
+						VariableValueType: jsonparser.Number,
 					},
 					{
 						Data:        []byte(`}}`),
@@ -487,16 +492,17 @@ func TestDataLoader_LoadBatch(t *testing.T) {
 				InputTemplate: InputTemplate{
 					Segments: []TemplateSegment{
 						{
-							Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":"`),
+							Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":`),
 							SegmentType: StaticSegmentType,
 						},
 						{
 							SegmentType:        VariableSegmentType,
 							VariableSource:     VariableSourceObject,
 							VariableSourcePath: []string{"upc"},
+							VariableValueType: jsonparser.String,
 						},
 						{
-							Data:        []byte(`","__typename":"Product"}]}}}`),
+							Data:        []byte(`,"__typename":"Product"}]}}}`),
 							SegmentType: StaticSegmentType,
 						},
 					},
@@ -580,16 +586,17 @@ func TestDataLoader_LoadBatch(t *testing.T) {
 					InputTemplate: InputTemplate{
 						Segments: []TemplateSegment{
 							{
-								Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":"`),
+								Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":`),
 								SegmentType: StaticSegmentType,
 							},
 							{
 								SegmentType:        VariableSegmentType,
 								VariableSource:     VariableSourceObject,
 								VariableSourcePath: []string{"upc"},
+								VariableValueType: jsonparser.String,
 							},
 							{
-								Data:        []byte(`","__typename":"Product"}]}}}`),
+								Data:        []byte(`,"__typename":"Product"}]}}}`),
 								SegmentType: StaticSegmentType,
 							},
 						},

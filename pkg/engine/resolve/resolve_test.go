@@ -1841,16 +1841,17 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 									InputTemplate: InputTemplate{
 										Segments: []TemplateSegment{
 											{
-												Data:        []byte(`{"method":"POST","url":"http://localhost:4002","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {reviews {body product {upc __typename}}}}}","variables":{"representations":[{"id":"`),
+												Data:        []byte(`{"method":"POST","url":"http://localhost:4002","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {reviews {body product {upc __typename}}}}}","variables":{"representations":[{"id":`),
 												SegmentType: StaticSegmentType,
 											},
 											{
 												SegmentType:        VariableSegmentType,
 												VariableSource:     VariableSourceObject,
 												VariableSourcePath: []string{"id"},
+												VariableValueType: jsonparser.String,
 											},
 											{
-												Data:        []byte(`","__typename":"User"}]}}}`),
+												Data:        []byte(`,"__typename":"User"}]}}}`),
 												SegmentType: StaticSegmentType,
 											},
 										},
@@ -1905,16 +1906,17 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 																InputTemplate: InputTemplate{
 																	Segments: []TemplateSegment{
 																		{
-																			Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":"`),
+																			Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":`),
 																			SegmentType: StaticSegmentType,
 																		},
 																		{
 																			SegmentType:        VariableSegmentType,
 																			VariableSource:     VariableSourceObject,
 																			VariableSourcePath: []string{"upc"},
+																			VariableValueType: jsonparser.String,
 																		},
 																		{
-																			Data:        []byte(`","__typename":"Product"}]}}}`),
+																			Data:        []byte(`,"__typename":"Product"}]}}}`),
 																			SegmentType: StaticSegmentType,
 																		},
 																	},
@@ -2037,16 +2039,17 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 									InputTemplate: InputTemplate{
 										Segments: []TemplateSegment{
 											{
-												Data:        []byte(`{"method":"POST","url":"http://localhost:4002","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {reviews {body product {upc __typename}}}}}","variables":{"representations":[{"id":"`),
+												Data:        []byte(`{"method":"POST","url":"http://localhost:4002","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {reviews {body product {upc __typename}}}}}","variables":{"representations":[{"id":`),
 												SegmentType: StaticSegmentType,
 											},
 											{
 												SegmentType:        VariableSegmentType,
 												VariableSource:     VariableSourceObject,
 												VariableSourcePath: []string{"id"},
+												VariableValueType: jsonparser.String,
 											},
 											{
-												Data:        []byte(`","__typename":"User"}]}}}`),
+												Data:        []byte(`,"__typename":"User"}]}}}`),
 												SegmentType: StaticSegmentType,
 											},
 										},
@@ -2098,16 +2101,17 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 																InputTemplate: InputTemplate{
 																	Segments: []TemplateSegment{
 																		{
-																			Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":"`),
+																			Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"upc":`),
 																			SegmentType: StaticSegmentType,
 																		},
 																		{
 																			SegmentType:        VariableSegmentType,
 																			VariableSource:     VariableSourceObject,
 																			VariableSourcePath: []string{"upc"},
+																			VariableValueType: jsonparser.String,
 																		},
 																		{
-																			Data:        []byte(`","__typename":"Product"}]}}}`),
+																			Data:        []byte(`,"__typename":"Product"}]}}}`),
 																			SegmentType: StaticSegmentType,
 																		},
 																	},
