@@ -41,7 +41,7 @@ type Planner struct {
 	rootFieldName              string // rootFieldName - holds name of root type field
 	rootFieldRef               int    // rootFieldRef - holds ref of root type field
 	batchFactory               resolve.DataSourceBatchFactory
-	argTypeRef                 int    // argTypeRef - holds current argument type ref from the definition
+	argTypeRef                 int // argTypeRef - holds current argument type ref from the definition
 }
 
 func (p *Planner) DownstreamResponseFieldAlias(downstreamFieldRef int) (alias string, exists bool) {
@@ -165,7 +165,7 @@ func (p *Planner) ConfigureFetch() plan.FetchConfiguration {
 			ExtractGraphqlResponse:    true,
 			ExtractFederationEntities: p.extractEntities,
 		},
-		BatchConfig:          batchConfig,
+		BatchConfig: batchConfig,
 	}
 }
 
@@ -420,7 +420,7 @@ func (p *Planner) addRepresentationsVariable() {
 	representationsJson, _ := sjson.SetRawBytes(nil, "__typename", []byte("\""+p.lastFieldEnclosingTypeName+"\""))
 	for i := range fields {
 		objectVariable := &resolve.ObjectVariable{
-			Path: []string{fields[i]},
+			Path:                 []string{fields[i]},
 			RenderAsGraphQLValue: true,
 		}
 		fieldDef := p.fieldDefinition(fields[i], p.lastFieldEnclosingTypeName)
@@ -542,11 +542,22 @@ func (p *Planner) isNestedRequest() bool {
 func (p *Planner) storeArgType(typeName, fieldName, argName string) {
 	typeNode, _ := p.visitor.Definition.Index.FirstNodeByNameStr(typeName)
 
+	resolveType := func(d *ast.Document, ref int) (typeRef int) {
+		typeRef = ref
+		graphqlType := d.Types[ref]
+		for (graphqlType.TypeKind != ast.TypeKindNamed) && (graphqlType.TypeKind != ast.TypeKindList) {
+			typeRef = graphqlType.OfType
+			graphqlType = d.Types[typeRef]
+
+		}
+		return
+	}
+
 	for _, fieldDefRef := range p.visitor.Definition.ObjectTypeDefinitions[typeNode.Ref].FieldsDefinition.Refs {
 		if bytes.Equal(p.visitor.Definition.FieldDefinitionNameBytes(fieldDefRef), []byte(fieldName)) {
 			for _, argDefRef := range p.visitor.Definition.FieldDefinitions[fieldDefRef].ArgumentsDefinition.Refs {
 				if bytes.Equal(p.visitor.Definition.InputValueDefinitionNameBytes(argDefRef), []byte(argName)) {
-					p.argTypeRef = p.visitor.Definition.ResolveUnderlyingType(p.visitor.Definition.InputValueDefinitions[argDefRef].Type)
+					p.argTypeRef = resolveType(p.visitor.Definition, p.visitor.Definition.InputValueDefinitions[argDefRef].Type)
 				}
 			}
 		}
@@ -581,7 +592,7 @@ func (p *Planner) configureFieldArgumentSource(upstreamFieldRef, downstreamField
 	variableNameStr := p.visitor.Operation.VariableValueNameString(value.Ref)
 
 	contextVariable := &resolve.ContextVariable{
-		Path: []string{variableNameStr},
+		Path:                 []string{variableNameStr},
 		RenderAsGraphQLValue: true,
 	}
 	contextVariable.SetJsonValueType(p.visitor.Definition, p.visitor.Definition, p.argTypeRef)
@@ -675,7 +686,7 @@ func (p *Planner) addVariableDefinitionsRecursively(value ast.Value, sourcePath 
 
 	fieldType := p.resolveNestedArgumentType(fieldName)
 	contextVariable := &resolve.ContextVariable{
-		Path: append(sourcePath, variableNameStr),
+		Path:                 append(sourcePath, variableNameStr),
 		RenderAsGraphQLValue: true,
 	}
 	contextVariable.SetJsonValueType(p.visitor.Definition, p.visitor.Definition, fieldType)
@@ -716,7 +727,7 @@ func (p *Planner) configureObjectFieldSource(upstreamFieldRef, downstreamFieldRe
 	p.upstreamOperation.AddVariableDefinitionToOperationDefinition(p.nodes[0].Ref, variableValue, importedType)
 
 	objectVariableName, exists := p.variables.AddVariable(&resolve.ObjectVariable{
-		Path: argumentConfiguration.SourcePath,
+		Path:                 argumentConfiguration.SourcePath,
 		RenderAsGraphQLValue: true,
 	})
 	if !exists {
@@ -955,8 +966,8 @@ func (p *Planner) addField(ref int) {
 
 type Factory struct {
 	BatchFactory resolve.DataSourceBatchFactory
-	HTTPClient *http.Client
-	wsClient   *WebSocketGraphQLSubscriptionClient
+	HTTPClient   *http.Client
+	wsClient     *WebSocketGraphQLSubscriptionClient
 }
 
 func (f *Factory) Planner(ctx context.Context) plan.DataSourcePlanner {
@@ -964,7 +975,7 @@ func (f *Factory) Planner(ctx context.Context) plan.DataSourcePlanner {
 		f.wsClient = NewWebSocketGraphQLSubscriptionClient(f.HTTPClient, ctx, WithReadLimit(3276800))
 	}
 	return &Planner{
-		batchFactory: f.BatchFactory,
+		batchFactory:       f.BatchFactory,
 		fetchClient:        f.HTTPClient,
 		subscriptionClient: f.wsClient,
 	}
