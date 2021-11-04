@@ -542,22 +542,11 @@ func (p *Planner) isNestedRequest() bool {
 func (p *Planner) storeArgType(typeName, fieldName, argName string) {
 	typeNode, _ := p.visitor.Definition.Index.FirstNodeByNameStr(typeName)
 
-	resolveType := func(d *ast.Document, ref int) (typeRef int) {
-		typeRef = ref
-		graphqlType := d.Types[ref]
-		for (graphqlType.TypeKind != ast.TypeKindNamed) && (graphqlType.TypeKind != ast.TypeKindList) {
-			typeRef = graphqlType.OfType
-			graphqlType = d.Types[typeRef]
-
-		}
-		return
-	}
-
 	for _, fieldDefRef := range p.visitor.Definition.ObjectTypeDefinitions[typeNode.Ref].FieldsDefinition.Refs {
 		if bytes.Equal(p.visitor.Definition.FieldDefinitionNameBytes(fieldDefRef), []byte(fieldName)) {
 			for _, argDefRef := range p.visitor.Definition.FieldDefinitions[fieldDefRef].ArgumentsDefinition.Refs {
 				if bytes.Equal(p.visitor.Definition.InputValueDefinitionNameBytes(argDefRef), []byte(argName)) {
-					p.argTypeRef = resolveType(p.visitor.Definition, p.visitor.Definition.InputValueDefinitions[argDefRef].Type)
+					p.argTypeRef = p.visitor.Definition.ResolveListOrNameType(p.visitor.Definition.InputValueDefinitions[argDefRef].Type)
 				}
 			}
 		}
@@ -638,7 +627,7 @@ func (p *Planner) applyInlineFieldArgument(upstreamField, downstreamField int, a
 // fieldName - exists only for ast.ValueKindObject type of argument
 func (p *Planner) resolveNestedArgumentType(fieldName []byte) (fieldTypeRef int) {
 	if fieldName == nil {
-		return p.visitor.Definition.ResolveUnderlyingType(p.argTypeRef)
+		return p.visitor.Definition.ResolveListOrNameType(p.argTypeRef)
 	}
 
 	argTypeName := p.visitor.Definition.ResolveTypeNameString(p.argTypeRef)
@@ -646,7 +635,7 @@ func (p *Planner) resolveNestedArgumentType(fieldName []byte) (fieldTypeRef int)
 
 	for _, inputFieldDefRef := range p.visitor.Definition.InputObjectTypeDefinitions[argTypeNode.Ref].InputFieldsDefinition.Refs {
 		if bytes.Equal(p.visitor.Definition.InputValueDefinitionNameBytes(inputFieldDefRef), fieldName) {
-			return p.visitor.Definition.ResolveUnderlyingType(p.visitor.Definition.InputValueDefinitions[inputFieldDefRef].Type)
+			return p.visitor.Definition.ResolveListOrNameType(p.visitor.Definition.InputValueDefinitions[inputFieldDefRef].Type)
 		}
 	}
 
