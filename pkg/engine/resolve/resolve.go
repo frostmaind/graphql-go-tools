@@ -715,6 +715,16 @@ func (r *Resolver) resolveArray(ctx *Context, array *Array, data []byte, arrayBu
 		return
 	}
 
+	//if bytes.Equal(data, literal.NULL) {
+	//	if array.Nullable {
+	//		r.resolveNull(arrayBuf.Data)
+	//		return
+	//	}
+	//
+	//	r.addResolveError(ctx, arrayBuf)
+	//	return errNonNullableFieldValueIsNull
+	//}
+
 	arrayItems := r.byteSlicesPool.Get().(*[][]byte)
 	defer func() {
 		*arrayItems = (*arrayItems)[:0]
@@ -975,7 +985,7 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 	if len(object.Path) != 0 {
 		data, _, _, _ = jsonparser.Get(data, object.Path...)
 
-		if len(data) == 0 {
+		if len(data) == 0 || bytes.Equal(data, literal.NULL){
 			if object.Nullable {
 				r.resolveNull(objectBuf.Data)
 				return
