@@ -1343,6 +1343,11 @@ func (i *InputTemplate) renderContextVariable(ctx *Context, segment TemplateSegm
 		preparedInput.WriteBytes(literal.NULL)
 		return nil
 	}
+
+	if (segment.VariableValueType == jsonparser.Array) && (valueType != jsonparser.Array) && (valueType == segment.VariableValueArrayValueType) {
+		return renderGraphQLValue(value, segment.VariableValueArrayValueType, segment.OmitObjectKeyQuotes, segment.EscapeQuotes, preparedInput)
+	}
+
 	if segment.RenderVariableAsPlainValue {
 		preparedInput.WriteBytes(value)
 		return nil
