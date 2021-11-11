@@ -779,16 +779,7 @@ func (v *valuesVisitor) valueSatisfiesInputValueDefinitionType(value ast.Value, 
 		case ast.ValueKindNull:
 			return false
 		case ast.ValueKindVariable:
-			variableName := v.operation.VariableValueNameBytes(value.Ref)
-			variableDefinition, exists := v.operation.VariableDefinitionByNameAndOperation(v.Ancestors[0].Ref, variableName)
-			if !exists {
-				return false
-			}
-			variableTypeRef := v.operation.VariableDefinitions[variableDefinition].Type
-			importedDefinitionType := v.importer.ImportType(definitionTypeRef, v.definition, v.operation)
-			if !v.operation.TypesAreEqualDeep(importedDefinitionType, variableTypeRef) {
-				return false
-			}
+			return v.valueVariableAreEqualDeep(value, definitionTypeRef)
 		}
 		return v.valueSatisfiesInputValueDefinitionType(value, v.definition.Types[definitionTypeRef].OfType)
 	case ast.TypeKindNamed:
@@ -798,10 +789,24 @@ func (v *valuesVisitor) valueSatisfiesInputValueDefinitionType(value ast.Value, 
 		}
 		return v.valueSatisfiesTypeDefinitionNode(value, node)
 	case ast.TypeKindList:
+		if value.Kind == ast.ValueKindVariable {
+			return v.valueVariableAreEqualDeep(value, definitionTypeRef)
+		}
 		return v.valueSatisfiesListType(value, v.definition.Types[definitionTypeRef].OfType)
 	default:
 		return false
 	}
+}
+
+func (v *valuesVisitor) valueVariableAreEqualDeep(value ast.Value, definitionTypeRef int) bool {
+	variableName := v.operation.VariableValueNameBytes(value.Ref)
+	variableDefinition, exists := v.operation.VariableDefinitionByNameAndOperation(v.Ancestors[0].Ref, variableName)
+	if !exists {
+		return false
+	}
+	variableTypeRef := v.operation.VariableDefinitions[variableDefinition].Type
+	importedDefinitionType := v.importer.ImportType(definitionTypeRef, v.definition, v.operation)
+	return v.operation.TypesAreEqualDeep(importedDefinitionType, variableTypeRef)
 }
 
 func (v *valuesVisitor) valueSatisfiesListType(value ast.Value, listType int) bool {
