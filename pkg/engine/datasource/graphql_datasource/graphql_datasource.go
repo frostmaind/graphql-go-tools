@@ -579,6 +579,10 @@ func (p *Planner) configureFieldArgumentSource(upstreamFieldRef, downstreamField
 	}
 	variableName := p.visitor.Operation.VariableValueNameBytes(value.Ref)
 	variableNameStr := p.visitor.Operation.VariableValueNameString(value.Ref)
+	variableDefinition, exists := p.visitor.Operation.VariableDefinitionByNameAndOperation(p.visitor.Walker.Ancestors[0].Ref, variableName)
+	if !exists {
+		return
+	}
 
 	contextVariable := &resolve.ContextVariable{
 		Path:                 []string{variableNameStr},
@@ -587,7 +591,12 @@ func (p *Planner) configureFieldArgumentSource(upstreamFieldRef, downstreamField
 	contextVariable.SetJsonValueType(p.visitor.Definition, p.visitor.Definition, p.argTypeRef)
 
 	contextVariableName, exists := p.variables.AddVariable(contextVariable)
-	variableValueRef, argRef := p.upstreamOperation.AddVariableValueArgument([]byte(argumentName), variableName) // add the argument to the field, but don't redefine it
+	importedValue := p.visitor.Importer.ImportValue(value, p.visitor.Operation, p.upstreamOperation)
+	argRef := p.upstreamOperation.AddArgument(ast.Argument{
+		Name:  p.upstreamOperation.Input.AppendInputString(argumentName),
+		Value: importedValue,
+	})
+
 	p.upstreamOperation.AddArgumentToField(upstreamFieldRef, argRef)
 
 	if exists { // if the variable exists we don't have to put it onto the variables declaration again, skip
@@ -599,8 +608,9 @@ func (p *Planner) configureFieldArgumentSource(upstreamFieldRef, downstreamField
 		if !p.visitor.Operation.VariableValueNameBytes(ref).Equals(variableName) {
 			continue
 		}
-		importedType := p.visitor.Importer.ImportType(p.visitor.Operation.VariableDefinitions[i].Type, p.visitor.Operation, p.upstreamOperation)
-		p.upstreamOperation.AddVariableDefinitionToOperationDefinition(p.nodes[0].Ref, variableValueRef, importedType)
+
+		importedVariableDefinition := p.visitor.Importer.ImportVariableDefinition(variableDefinition, p.visitor.Operation, p.upstreamOperation)
+		p.upstreamOperation.AddImportedVariableDefinitionToOperationDefinition(p.nodes[0].Ref, importedVariableDefinition)
 	}
 
 	p.upstreamVariables, _ = sjson.SetRawBytes(p.upstreamVariables, variableNameStr, []byte(contextVariableName))
