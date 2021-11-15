@@ -95,6 +95,8 @@ func NewWebSocketGraphQLSubscriptionClient(httpClient *http.Client, ctx context.
 // If an existing WS with the same ID (Hash) exists, it is being re-used
 // If no connection exists, the client initiates a new one and sends the "init" and "connection ack" messages
 func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, options GraphQLSubscriptionOptions, next chan<- []byte) error {
+	c.handlersMu.Lock()
+	defer c.handlersMu.Unlock()
 
 	/* handlerID, err := c.generateHandlerIDHash(options) // deduplication implementation */
 	handlerID, err := c.generateNonDeduplicationID()
@@ -108,8 +110,6 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 		next:    next,
 	}
 
-	c.handlersMu.Lock()
-	defer c.handlersMu.Unlock()
 	handler, exists := c.handlers[handlerID]
 	if exists {
 		select {
