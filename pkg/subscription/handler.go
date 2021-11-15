@@ -107,7 +107,7 @@ func NewHandlerWithInitFunc(
 		client:                     client,
 		keepAliveInterval:          keepAliveInterval,
 		subscriptionUpdateInterval: subscriptionUpdateInterval,
-		subCancellations:           subscriptionCancellations{},
+		subCancellations:           newSubscriptionCancellations(),
 		executorPool:               executorPool,
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
@@ -515,5 +515,5 @@ func (h *Handler) handleError(id string, errors graphql.RequestErrors) {
 
 // ActiveSubscriptions will return the actual number of active subscriptions for that client.
 func (h *Handler) ActiveSubscriptions() int {
-	return len(h.subCancellations)
+	return h.subCancellations.Count()
 }
