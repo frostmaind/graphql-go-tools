@@ -98,6 +98,21 @@ func (t *Transformer) AppendSelectionSet(precedence Precedence, ref int, appendR
 
 // ReplaceFragmentSpread registers an action to replace a fragment spread with a selectionset
 func (t *Transformer) ReplaceFragmentSpread(precedence Precedence, selectionSet int, spreadRef int, replaceWithSelectionSet int) {
+	for _, action := range t.actions {
+		switch act := action.transformation.(type) {
+		case replaceFragmentSpread:
+			if act.replaceWithSelectionSet != replaceWithSelectionSet {
+				continue
+			}
+
+			if precedence.Depth > action.precedence.Depth {
+				precedence.Depth =  action.precedence.Depth
+			} else {
+				action.precedence.Depth = precedence.Depth
+			}
+		}
+	}
+
 	t.actions = append(t.actions, action{
 		precedence: precedence,
 		transformation: replaceFragmentSpread{
