@@ -357,8 +357,8 @@ func TestHandler_Handle(t *testing.T) {
 				require.Eventually(t, handlerRoutine(ctx), 1*time.Second, 5*time.Millisecond)
 
 				expectedMessage := Message{
-					Type:    MessageTypeConnectionTerminate,
-					Payload: jsonizePayload(t, "failed to accept the websocket connection"),
+					Type:    MessageTypeConnectionError,
+					Payload: jsonizePayload(t, "failed to accept the websocket connection: unknown user: 111"),
 				}
 
 				messagesFromServer := client.readFromServer()
