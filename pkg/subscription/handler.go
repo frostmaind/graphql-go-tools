@@ -431,34 +431,34 @@ func (h *Handler) sendKeepAlive() {
 	}
 }
 
-func (h *Handler) terminateConnection(reason interface{}) {
-	payloadBytes, err := json.Marshal(reason)
-	if err != nil {
-		h.logger.Error("subscription.Handler.terminateConnection()",
-			abstractlogger.Error(err),
-			abstractlogger.Any("errorPayload", reason),
-		)
-	}
-
-	connectionErrorMessage := Message{
-		Type:    MessageTypeConnectionTerminate,
-		Payload: payloadBytes,
-	}
-
-	err = h.client.WriteToClient(connectionErrorMessage)
-	if err != nil {
-		h.logger.Error("subscription.Handler.terminateConnection()",
-			abstractlogger.Error(err),
-		)
-
-		err := h.client.Disconnect()
-		if err != nil {
-			h.logger.Error("subscription.Handler.terminateConnection()",
-				abstractlogger.Error(err),
-			)
-		}
-	}
-}
+//func (h *Handler) terminateConnection(reason interface{}) {
+//	payloadBytes, err := json.Marshal(reason)
+//	if err != nil {
+//		h.logger.Error("subscription.Handler.terminateConnection()",
+//			abstractlogger.Error(err),
+//			abstractlogger.Any("errorPayload", reason),
+//		)
+//	}
+//
+//	connectionErrorMessage := Message{
+//		Type:    MessageTypeConnectionTerminate,
+//		Payload: payloadBytes,
+//	}
+//
+//	err = h.client.WriteToClient(connectionErrorMessage)
+//	if err != nil {
+//		h.logger.Error("subscription.Handler.terminateConnection()",
+//			abstractlogger.Error(err),
+//		)
+//
+//		err := h.client.Disconnect()
+//		if err != nil {
+//			h.logger.Error("subscription.Handler.terminateConnection()",
+//				abstractlogger.Error(err),
+//			)
+//		}
+//	}
+//}
 
 // handleConnectionError will handle a connection error message.
 func (h *Handler) handleConnectionError(errorPayload interface{}) {
