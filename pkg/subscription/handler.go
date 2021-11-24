@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -157,7 +158,7 @@ func (h *Handler) Handle(ctx context.Context) {
 			case MessageTypeConnectionInit:
 				ctx, err = h.handleInit(ctx, message.Payload)
 				if err != nil {
-					h.terminateConnection("failed to accept the websocket connection")
+					h.handleConnectionError(fmt.Sprintf("failed to accept the websocket connection: %s", err.Error()))
 					return
 				}
 
