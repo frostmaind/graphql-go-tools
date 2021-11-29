@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/buger/jsonparser"
@@ -119,7 +120,7 @@ func (df *dataLoaderFactory) newDataLoader(initialValue []byte) *dataLoader {
 		buf.Data.WriteBytes(initialValue)
 
 		dataloader.fetches[initialValueID] = &batchFetchState{
-			nextIdx:    0,
+			nextIdxMap:   map[string]int{},
 			fetchError: nil,
 			results:    []*BufPair{buf},
 		}
@@ -161,7 +162,9 @@ func (d *dataLoader) Load(ctx *Context, fetch *SingleFetch, responsePair *BufPai
 		return
 	}
 
-	fetchResult = &batchFetchState{}
+	fetchResult = &batchFetchState{
+		rootResponseElements: ctx.responseElements,
+	}
 
 	parentResult, ok := d.getFetchState(ctx.lastFetchID)
 
@@ -215,7 +218,9 @@ func (d *dataLoader) LoadBatch(ctx *Context, batchFetch *BatchFetch, responsePai
 		return
 	}
 
-	fetchResult = &batchFetchState{}
+	fetchResult = &batchFetchState{
+		rootResponseElements: ctx.responseElements,
+	}
 
 	parentResult, ok := d.getFetchState(ctx.lastFetchID)
 	if !ok {
@@ -262,7 +267,9 @@ func (d *dataLoader) resolveBatchFetch(ctx *Context, batchFetch *BatchFetch, fet
 		results[i] = d.getResultBufPair()
 	}
 
-	fetchState = &batchFetchState{}
+	fetchState = &batchFetchState{
+		rootResponseElements: ctx.responseElements,
+	}
 
 	if err = d.fetcher.FetchBatch(ctx, batchFetch, inputBufs, results); err != nil {
 		fetchState.fetchError = err
@@ -390,7 +397,8 @@ type fetchState interface {
 }
 
 type batchFetchState struct {
-	nextIdx int
+	rootResponseElements []string
+	nextIdxMap map[string]int
 
 	fetchError error
 	results    []*BufPair
@@ -416,9 +424,13 @@ func (b *batchFetchState) next(ctx *Context) (*BufPair, error) {
 		return nil, b.fetchError
 	}
 
+	responseElemKey := strings.Join(ctx.responseElements, ".")
+	nextIdx := b.nextIdxMap[responseElemKey]
+
+	if
 	res := b.results[b.nextIdx]
 
-	b.nextIdx++
+	b.nextIdxMap[responseElemKey]++
 
 	return res, nil
 }

@@ -1003,6 +1003,7 @@ type configurationVisitor struct {
 	fieldBuffers          map[int]int
 	fieldNames            []string
 	fieldTypes            []string
+	fieldRefs             []int
 
 	ctx context.Context
 }
@@ -1149,11 +1150,17 @@ func (c *configurationVisitor) isChild(plannerConfig *plannerConfiguration, curr
 }
 
 func (c *configurationVisitor) EnterField(ref int) {
+	var parentRef int
+	if len(c.fieldRefs) > 0 {
+		parentRef = c.fieldRefs[len(c.fieldRefs)-1]
+		_ = parentRef
+	}
 	fieldName := c.operation.FieldNameUnsafeString(ref)
 	c.fieldNames = append(c.fieldNames, fieldName)
 	fieldAliasOrName := c.operation.FieldAliasOrNameString(ref)
 	typeName := c.walker.EnclosingTypeDefinition.NameString(c.definition)
 	c.fieldTypes = append(c.fieldTypes, typeName)
+	c.fieldRefs = append(c.fieldRefs, ref)
 	parent := c.walker.Path.DotDelimitedString()
 	current := parent + "." + fieldAliasOrName
 	root := c.walker.Ancestors[0]
@@ -1177,8 +1184,16 @@ func (c *configurationVisitor) EnterField(ref int) {
 			return
 		}
 		if c.isChild(&planner, current) {
+			// @TODO add recursively
 			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: parent})
 			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
+			c.fieldBuffers[ref] = planner.bufferID
+			c.fetches = append(c.fetches, objectFetchConfiguration{
+				bufferID:       planner.bufferID,
+				planner:        planner.planner,
+				isSubscription: false,
+				fieldRef:       ref,
+			})
 			return
 		}
 	}
@@ -1217,10 +1232,13 @@ func (c *configurationVisitor) EnterField(ref int) {
 
 func (c *configurationVisitor) LeaveField(ref int) {
 	if len(c.fieldNames) > 0 {
-		c.fieldNames = c.fieldNames[0 : len(c.fieldNames)-1]
+		c.fieldNames = c.fieldNames[0:len(c.fieldNames)-1]
 	}
 	if len(c.fieldTypes) > 0 {
-		c.fieldTypes = c.fieldTypes[0 : len(c.fieldTypes)-1]
+		c.fieldTypes = c.fieldTypes[0:len(c.fieldTypes)-1]
+	}
+	if len(c.fieldRefs) > 0 {
+		c.fieldRefs = c.fieldRefs[0:len(c.fieldRefs)-1]
 	}
 	fieldAliasOrName := c.operation.FieldAliasOrNameString(ref)
 	parent := c.walker.Path.DotDelimitedString()
@@ -1262,6 +1280,11 @@ func (c *configurationVisitor) EnterDocument(operation, definition *ast.Document
 		c.fieldTypes = make([]string, 0, 8)
 	} else {
 		c.fieldTypes = c.fieldTypes[:0]
+	}
+	if c.fieldRefs == nil {
+		c.fieldRefs = make([]int, 0, 8)
+	} else {
+		c.fieldRefs = c.fieldRefs[:8]
 	}
 }
 
