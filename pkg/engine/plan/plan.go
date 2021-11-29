@@ -386,13 +386,13 @@ func (v *Visitor) EnterSelectionSet(ref int) {
 }
 
 func (v *Visitor) EnterField(ref int) {
+	fieldName := v.Operation.FieldNameBytes(ref)
+	fieldAliasOrName := v.Operation.FieldAliasOrNameBytes(ref)
 
 	if v.skipField(ref) {
 		return
 	}
 
-	fieldName := v.Operation.FieldNameBytes(ref)
-	fieldAliasOrName := v.Operation.FieldAliasOrNameBytes(ref)
 	if bytes.Equal(fieldName, literal.TYPENAME) {
 		v.currentField = &resolve.Field{
 			Name: fieldAliasOrName,
@@ -439,12 +439,16 @@ func (v *Visitor) EnterField(ref int) {
 	path := v.resolveFieldPath(ref)
 	fieldDefinitionType := v.Definition.FieldDefinitionType(fieldDefinition)
 	bufferID, hasBuffer := v.fieldBuffers[ref]
+	if fieldAliasOrName.String() == "oddsQA" {
+		_ = fieldAliasOrName
+	}
+	onTypeName := v.resolveOnTypeName()
 	v.currentField = &resolve.Field{
 		Name:       fieldAliasOrName,
 		Value:      v.resolveFieldValue(ref, fieldDefinitionType, true, path),
 		HasBuffer:  hasBuffer,
 		BufferID:   bufferID,
-		OnTypeName: v.resolveOnTypeName(),
+		OnTypeName: onTypeName,
 		Position: resolve.Position{
 			Line:   v.Operation.Fields[ref].Position.LineStart,
 			Column: v.Operation.Fields[ref].Position.CharStart,
@@ -631,6 +635,9 @@ func (v *Visitor) resolveFieldPath(ref int) []string {
 
 	for i := range v.Config.Fields {
 		if v.Config.Fields[i].TypeName == typeName && v.Config.Fields[i].FieldName == fieldName {
+			if typeName == "SportEventMarket" && fieldName == "oddsQA" {
+				_ = fieldName
+			}
 			if aliasOverride {
 				override, exists := config.planner.DownstreamResponseFieldAlias(ref)
 				if exists {
@@ -729,7 +736,7 @@ func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *
 		switch parts[0] {
 		case "object":
 			variable := &resolve.ObjectVariable{
-				Path: path,
+				Path:               path,
 				RenderAsPlainValue: true,
 			}
 			variableName, _ = variables.AddVariable(variable)
@@ -994,12 +1001,15 @@ type configurationVisitor struct {
 	fetches               []objectFetchConfiguration
 	currentBufferId       int
 	fieldBuffers          map[int]int
+	fieldNames            []string
+	fieldTypes            []string
 
 	ctx context.Context
 }
 
 type plannerConfiguration struct {
 	parentPath              string
+	parentTypeName          string
 	planner                 DataSourcePlanner
 	paths                   []pathConfiguration
 	dataSourceConfiguration DataSourceConfiguration
@@ -1094,6 +1104,14 @@ func (p *plannerConfiguration) hasRootNode(typeName, fieldName string) bool {
 	return false
 }
 
+func (p *plannerConfiguration) hasNode(typeName, fieldName string) bool {
+	if p.hasRootNode(typeName, fieldName) {
+		return true
+	}
+
+	return p.hasChildNode(typeName, fieldName)
+}
+
 type pathConfiguration struct {
 	path              string
 	exitPlannerOnNode bool
@@ -1107,10 +1125,35 @@ func (c *configurationVisitor) EnterOperationDefinition(ref int) {
 	}
 }
 
+func (c *configurationVisitor) isChild(plannerConfig *plannerConfiguration, currentPath string) bool {
+	if !strings.HasPrefix(currentPath, plannerConfig.parentPath) {
+		return false
+	}
+
+	childPath := strings.TrimLeft(strings.TrimLeft(currentPath, plannerConfig.parentPath), ".")
+	childParts := len(strings.Split(childPath, "."))
+	if childParts == 0 {
+		return false
+	}
+
+	childFields := c.fieldNames[len(c.fieldNames)-childParts:]
+	childTypes := c.fieldTypes[len(c.fieldTypes)-childParts:]
+
+	for i := range childFields {
+		if !plannerConfig.hasNode(childTypes[i], childFields[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *configurationVisitor) EnterField(ref int) {
 	fieldName := c.operation.FieldNameUnsafeString(ref)
+	c.fieldNames = append(c.fieldNames, fieldName)
 	fieldAliasOrName := c.operation.FieldAliasOrNameString(ref)
 	typeName := c.walker.EnclosingTypeDefinition.NameString(c.definition)
+	c.fieldTypes = append(c.fieldTypes, typeName)
 	parent := c.walker.Path.DotDelimitedString()
 	current := parent + "." + fieldAliasOrName
 	root := c.walker.Ancestors[0]
@@ -1118,6 +1161,9 @@ func (c *configurationVisitor) EnterField(ref int) {
 		return
 	}
 	isSubscription := c.isSubscription(root.Ref, current)
+	if fieldAliasOrName == "oddName" {
+		_ = fieldAliasOrName
+	}
 	for i, planner := range c.planners {
 		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
 			// same parent + root node = root sibling
@@ -1127,6 +1173,11 @@ func (c *configurationVisitor) EnterField(ref int) {
 		}
 		if planner.hasPath(parent) && planner.hasChildNode(typeName, fieldName) {
 			// has parent path + has child node = child
+			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
+			return
+		}
+		if c.isChild(&planner, current) {
+			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: parent})
 			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
 			return
 		}
@@ -1142,9 +1193,10 @@ func (c *configurationVisitor) EnterField(ref int) {
 			}
 			planner := c.config.DataSources[i].Factory.Planner(c.ctx)
 			c.planners = append(c.planners, plannerConfiguration{
-				bufferID:   bufferID,
-				parentPath: parent,
-				planner:    planner,
+				bufferID:       bufferID,
+				parentPath:     parent,
+				parentTypeName: typeName,
+				planner:        planner,
 				paths: []pathConfiguration{
 					{
 						path: current,
@@ -1164,6 +1216,12 @@ func (c *configurationVisitor) EnterField(ref int) {
 }
 
 func (c *configurationVisitor) LeaveField(ref int) {
+	if len(c.fieldNames) > 0 {
+		c.fieldNames = c.fieldNames[0 : len(c.fieldNames)-1]
+	}
+	if len(c.fieldTypes) > 0 {
+		c.fieldTypes = c.fieldTypes[0 : len(c.fieldTypes)-1]
+	}
 	fieldAliasOrName := c.operation.FieldAliasOrNameString(ref)
 	parent := c.walker.Path.DotDelimitedString()
 	current := parent + "." + fieldAliasOrName
@@ -1194,6 +1252,16 @@ func (c *configurationVisitor) EnterDocument(operation, definition *ast.Document
 		for i := range c.fieldBuffers {
 			delete(c.fieldBuffers, i)
 		}
+	}
+	if c.fieldNames == nil {
+		c.fieldNames = make([]string, 0, 8)
+	} else {
+		c.fieldNames = c.fieldNames[:0]
+	}
+	if c.fieldTypes == nil {
+		c.fieldTypes = make([]string, 0, 8)
+	} else {
+		c.fieldTypes = c.fieldTypes[:0]
 	}
 }
 
