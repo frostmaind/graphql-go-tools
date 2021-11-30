@@ -4,10 +4,11 @@ go 1.15
 
 require (
 	github.com/99designs/gqlgen v0.13.1-0.20210728041543-7e38dd46943c
-	github.com/OneOfOne/xxhash v1.2.8
+	github.com/OneOfOne/xxhash v1.2.8 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash v1.1.0
+	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/dave/jennifer v1.4.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/eclipse/paho.mqtt.golang v1.2.0
@@ -17,7 +18,6 @@ require (
 	github.com/gobwas/ws v1.0.4
 	github.com/golang/mock v1.4.1
 	github.com/gorilla/websocket v1.4.2
-	github.com/google/uuid v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/jensneuse/abstractlogger v0.0.4
