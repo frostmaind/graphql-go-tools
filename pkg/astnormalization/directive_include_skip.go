@@ -6,6 +6,8 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astvisitor"
 	"github.com/jensneuse/graphql-go-tools/pkg/lexer/literal"
+
+	"github.com/buger/jsonparser"
 )
 
 func directiveIncludeSkip(walker *astvisitor.Walker) {
@@ -47,19 +49,23 @@ func (d *directiveIncludeSkipVisitor) handleSkip(ref int) {
 		return
 	}
 	value := d.operation.ArgumentValue(arg)
-	if value.Kind != ast.ValueKindBoolean {
-		return
-	}
-	include := d.operation.BooleanValue(value.Ref)
-	switch include {
-	case false:
-		d.operation.RemoveDirectiveFromNode(d.Ancestors[len(d.Ancestors)-1], ref)
-	case true:
-		if len(d.Ancestors) < 2 {
+	var skip bool
+	var err error
+
+	switch value.Kind {
+	case ast.ValueKindBoolean:
+		skip = bool(d.operation.BooleanValue(value.Ref))
+	case ast.ValueKindVariable:
+		variableName := d.operation.VariableValueNameString(value.Ref)
+		if skip, err = jsonparser.GetBoolean(d.operation.Input.Variables, variableName); err != nil {
 			return
 		}
-		d.operation.RemoveNodeFromNode(d.Ancestors[len(d.Ancestors)-1], d.Ancestors[len(d.Ancestors)-2])
+
+	default:
+		return
 	}
+
+	d.applyDirective(ref, skip)
 }
 
 func (d *directiveIncludeSkipVisitor) handleInclude(ref int) {
@@ -71,14 +77,29 @@ func (d *directiveIncludeSkipVisitor) handleInclude(ref int) {
 		return
 	}
 	value := d.operation.ArgumentValue(arg)
-	if value.Kind != ast.ValueKindBoolean {
+	var include bool
+	var err error
+
+	switch value.Kind {
+	case ast.ValueKindBoolean:
+		include = bool(d.operation.BooleanValue(value.Ref))
+	case ast.ValueKindVariable:
+		variableName := d.operation.VariableValueNameString(value.Ref)
+		if include, err = jsonparser.GetBoolean(d.operation.Input.Variables, variableName); err != nil {
+			return
+		}
+	default:
 		return
 	}
-	include := d.operation.BooleanValue(value.Ref)
-	switch include {
-	case true:
-		d.operation.RemoveDirectiveFromNode(d.Ancestors[len(d.Ancestors)-1], ref)
+
+	d.applyDirective(ref, !include)
+}
+
+func (d *directiveIncludeSkipVisitor) applyDirective(directiveRef int, removeField bool) {
+	switch removeField {
 	case false:
+		d.operation.RemoveDirectiveFromNode(d.Ancestors[len(d.Ancestors)-1], directiveRef)
+	case true:
 		if len(d.Ancestors) < 2 {
 			return
 		}
