@@ -45,7 +45,9 @@ func (r *Request) Normalize(schema *Schema) (result NormalizationResult, err err
 
 	r.isNormalized = true
 	r.Variables = r.document.Input.Variables
-	normalizeDuplicatedFieldRefs(&r.document)
+	if err := normalizeDuplicatedFieldRefs(&r.document); err != nil {
+		return NormalizationResult{}, err
+	}
 
 	return NormalizationResult{Successful: true, Errors: nil}, nil
 }
