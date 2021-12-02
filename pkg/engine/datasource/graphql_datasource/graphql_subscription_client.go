@@ -111,6 +111,8 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 		select {
 		case handler.subscribeCh <- sub:
 		case <-ctx.Done():
+			close(next)
+			fmt.Println("Goroutine leak place detected")
 		}
 		return nil
 	}
