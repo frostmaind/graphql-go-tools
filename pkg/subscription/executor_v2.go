@@ -29,7 +29,7 @@ func NewExecutorV2Pool(engine *graphql.ExecutionEngineV2, connectionInitReqCtx c
 	}
 }
 
-func (e *ExecutorV2Pool) Get(payload []byte) (Executor, error) {
+func (e *ExecutorV2Pool) Get(ctx context.Context, payload []byte) (Executor, error) {
 	operation := graphql.Request{}
 	err := graphql.UnmarshalRequest(bytes.NewReader(payload), &operation)
 	if err != nil {
@@ -39,7 +39,7 @@ func (e *ExecutorV2Pool) Get(payload []byte) (Executor, error) {
 	return &ExecutorV2{
 		engine:    e.engine,
 		operation: &operation,
-		context:   context.Background(),
+		context:   ctx,
 		reqCtx:    e.connectionInitReqCtx,
 	}, nil
 }
@@ -77,6 +77,6 @@ func (e *ExecutorV2) SetContext(context context.Context) {
 func (e *ExecutorV2) Reset() {
 	e.engine = nil
 	e.operation = nil
-	e.context = context.Background()
+	e.context = context.TODO()
 	e.reqCtx = context.TODO()
 }

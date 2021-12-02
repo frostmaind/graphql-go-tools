@@ -52,7 +52,7 @@ type Client interface {
 
 // ExecutorPool is an abstraction for creating executors
 type ExecutorPool interface {
-	Get(payload []byte) (Executor, error)
+	Get(ctx context.Context, payload []byte) (Executor, error)
 	Put(executor Executor) error
 }
 
@@ -223,7 +223,7 @@ func (h *Handler) handleInit(ctx context.Context, payload []byte) (extendedCtx c
 
 // handleStart will handle s start message.
 func (h *Handler) handleStart(ctx context.Context, id string, payload []byte) {
-	executor, err := h.executorPool.Get(payload)
+	executor, err := h.executorPool.Get(ctx, payload)
 	if err != nil {
 		h.logger.Error("subscription.Handler.handleStart()",
 			abstractlogger.Error(err),
