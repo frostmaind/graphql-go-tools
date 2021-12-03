@@ -73,8 +73,8 @@ func NewWebSocketGraphQLSubscriptionClient(httpClient *http.Client, ctx context.
 		option(op)
 	}
 	return &WebSocketGraphQLSubscriptionClient{
-		httpClient: httpClient,
-		ctx:        ctx,
+		httpClient:  httpClient,
+		ctx:         ctx,
 		handlers:    map[uint64]*connectionHandler{},
 		log:         op.log,
 		readTimeout: op.readTimeout,
@@ -242,7 +242,10 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 	}()
 	h.subscribe(sub)
 	dataCh := make(chan []byte)
-	go h.readBlocking(readCtx, dataCh)
+	errCh := make(chan error, 1)
+
+	go func() { errCh <- h.readBlocking(readCtx, dataCh) }()
+
 	for {
 		if h.ctx.Err() != nil {
 			return
@@ -254,6 +257,12 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 		select {
 		case <-time.After(h.readTimeout):
 			continue
+		case readErr := <- errCh:
+			if readErr != nil {
+				h.log.Info("Got an error from WS reader", abstractlogger.String("message", readErr.Error()))
+				h.handleMessageTypeConnectionError()
+				return
+			}
 		case sub = <-h.subscribeCh:
 			h.subscribe(sub)
 		case data := <-dataCh:
@@ -282,14 +291,14 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 // readBlocking is a dedicated loop running in a separate goroutine
 // because the library "nhooyr.io/websocket" doesn't allow reading with a context with Timeout
 // we'll block forever on reading until the context of the connectionHandler stops
-func (h *connectionHandler) readBlocking(ctx context.Context, dataCh chan []byte) {
+func (h *connectionHandler) readBlocking(ctx context.Context, dataCh chan []byte) error {
 	for {
 		msgType, data, err := h.conn.Read(ctx)
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		if err != nil {
-			continue
+			return err
 		}
 		if msgType != websocket.MessageText {
 			continue
@@ -297,7 +306,7 @@ func (h *connectionHandler) readBlocking(ctx context.Context, dataCh chan []byte
 		select {
 		case dataCh <- data:
 		case <-ctx.Done():
-			return
+			return nil
 		}
 	}
 }
