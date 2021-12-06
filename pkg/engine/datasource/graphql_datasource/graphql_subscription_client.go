@@ -110,9 +110,10 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	if exists {
 		select {
 		case handler.subscribeCh <- sub:
+		case <-handler.connectionDoneCh:
+			c.handleClosedConnectionHandler(ctx, next)
 		case <-ctx.Done():
 			close(next)
-			fmt.Println("Goroutine leak place detected")
 		}
 		return nil
 	}
@@ -201,6 +202,18 @@ func (c *WebSocketGraphQLSubscriptionClient) generateHandlerIDHash(options Graph
 	return xxh.Sum64(), nil
 }
 
+func (c *WebSocketGraphQLSubscriptionClient) handleClosedConnectionHandler(ctx context.Context, next chan<- []byte) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	select {
+	case next <- []byte(connectionError):
+	case <-ctx.Done():
+	}
+
+	close(next)
+}
+
 func newConnectionHandler(ctx context.Context, conn *websocket.Conn, readTimeout time.Duration, log abstractlogger.Logger) *connectionHandler {
 	return &connectionHandler{
 		conn:               conn,
@@ -210,6 +223,7 @@ func newConnectionHandler(ctx context.Context, conn *websocket.Conn, readTimeout
 		nextSubscriptionID: 0,
 		subscriptions:      map[string]subscription{},
 		readTimeout:        readTimeout,
+		connectionDoneCh:   make(chan struct{}),
 	}
 }
 
@@ -224,6 +238,7 @@ type connectionHandler struct {
 	nextSubscriptionID int
 	subscriptions      map[string]subscription
 	readTimeout        time.Duration
+	connectionDoneCh   chan struct{}
 }
 
 type subscription struct {
@@ -239,6 +254,7 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 	defer func() {
 		h.unsubscribeAllAndCloseConn()
 		cancel()
+		close(h.connectionDoneCh)
 	}()
 	h.subscribe(sub)
 	dataCh := make(chan []byte)
@@ -257,7 +273,7 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 		select {
 		case <-time.After(h.readTimeout):
 			continue
-		case readErr := <- errCh:
+		case readErr := <-errCh:
 			if readErr != nil {
 				h.log.Info("Got an error from WS reader", abstractlogger.String("message", readErr.Error()))
 				h.handleMessageTypeConnectionError()
