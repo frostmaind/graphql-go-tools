@@ -487,7 +487,7 @@ func (v *Visitor) LeaveField(ref int) {
 	}
 	fieldDefinitionTypeNode := v.Definition.FieldDefinitionTypeNode(fieldDefinition)
 	switch fieldDefinitionTypeNode.Kind {
-	case ast.NodeKindObjectTypeDefinition, ast.NodeKindInterfaceTypeDefinition:
+	case ast.NodeKindObjectTypeDefinition, ast.NodeKindInterfaceTypeDefinition, ast.NodeKindUnionTypeDefinition:
 		v.objects = v.objects[:len(v.objects)-1]
 	}
 }

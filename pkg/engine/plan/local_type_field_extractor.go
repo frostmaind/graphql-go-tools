@@ -21,10 +21,11 @@ const (
 // so that only "local" fields will be generated
 type LocalTypeFieldExtractor struct {
 	document *ast.Document
+	baseSchema *ast.Document
 }
 
 func NewLocalTypeFieldExtractor(document *ast.Document) *LocalTypeFieldExtractor {
-	return &LocalTypeFieldExtractor{document: document}
+	return &LocalTypeFieldExtractor{document: document, baseSchema: baseSchema(document)}
 }
 
 // GetAllNodes returns all Root- & ChildNodes
@@ -143,7 +144,7 @@ func (e *LocalTypeFieldExtractor) addRootNodes(astNode ast.Node, rootNodes *[]Ty
 	// we need to first build the base schema so that we get a valid Index
 	// to look up if typeName is a RootOperationTypeName
 	// the service SDL itself might use ObjectTypeExtension types which will not be indexed
-	document := e.baseSchema()
+	document := e.baseSchema
 
 	// node should be an entity or a root operation type definition
 	// if document == nil, there are no root operation type definitions in this document
@@ -174,8 +175,8 @@ func (e *LocalTypeFieldExtractor) addRootNodes(astNode ast.Node, rootNodes *[]Ty
 	})
 }
 
-func (e *LocalTypeFieldExtractor) baseSchema() *ast.Document {
-	schemaSDL, err := astprinter.PrintString(e.document, nil)
+func baseSchema(sdlDocument *ast.Document) *ast.Document {
+	schemaSDL, err := astprinter.PrintString(sdlDocument, nil)
 	if err != nil {
 		return nil
 	}

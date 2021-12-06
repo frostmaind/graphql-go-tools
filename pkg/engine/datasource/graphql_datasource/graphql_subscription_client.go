@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/OneOfOne/xxhash"
 	"github.com/buger/jsonparser"
-	"github.com/google/uuid"
+	"github.com/cespare/xxhash/v2"
 	"github.com/jensneuse/abstractlogger"
 	"nhooyr.io/websocket"
 )
@@ -32,8 +31,7 @@ type WebSocketGraphQLSubscriptionClient struct {
 	ctx        context.Context
 	log        abstractlogger.Logger
 	hashPool   sync.Pool
-	/*handlers   map[uint64]*connectionHandler // deduplication implementation */
-	handlers   map[string]*connectionHandler
+	handlers   map[uint64]*connectionHandler
 	handlersMu sync.Mutex
 
 	readTimeout time.Duration
@@ -75,16 +73,15 @@ func NewWebSocketGraphQLSubscriptionClient(httpClient *http.Client, ctx context.
 		option(op)
 	}
 	return &WebSocketGraphQLSubscriptionClient{
-		httpClient: httpClient,
-		ctx:        ctx,
-		/*handlers:    map[uint64]*connectionHandler{}, // deduplication implementation */
-		handlers:    map[string]*connectionHandler{},
+		httpClient:  httpClient,
+		ctx:         ctx,
+		handlers:    map[uint64]*connectionHandler{},
 		log:         op.log,
 		readTimeout: op.readTimeout,
 		readLimit:   op.readLimit,
 		hashPool: sync.Pool{
 			New: func() interface{} {
-				return xxhash.New64()
+				return xxhash.New()
 			},
 		},
 	}
@@ -95,11 +92,8 @@ func NewWebSocketGraphQLSubscriptionClient(httpClient *http.Client, ctx context.
 // If an existing WS with the same ID (Hash) exists, it is being re-used
 // If no connection exists, the client initiates a new one and sends the "init" and "connection ack" messages
 func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, options GraphQLSubscriptionOptions, next chan<- []byte) error {
-	c.handlersMu.Lock()
-	defer c.handlersMu.Unlock()
 
-	/* handlerID, err := c.generateHandlerIDHash(options) // deduplication implementation */
-	handlerID, err := c.generateNonDeduplicationID()
+	handlerID, err := c.generateHandlerIDHash(options)
 	if err != nil {
 		return err
 	}
@@ -110,11 +104,16 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 		next:    next,
 	}
 
+	c.handlersMu.Lock()
+	defer c.handlersMu.Unlock()
 	handler, exists := c.handlers[handlerID]
 	if exists {
 		select {
 		case handler.subscribeCh <- sub:
+		case <-handler.connectionDoneCh:
+			c.handleClosedConnectionHandler(ctx, next)
 		case <-ctx.Done():
+			close(next)
 		}
 		return nil
 	}
@@ -149,7 +148,7 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	}
 
 	// init + ack
-		initialMessage := fmt.Sprintf(connectionInitMessage, string(initialPayload))
+	initialMessage := fmt.Sprintf(connectionInitMessage, string(initialPayload))
 	err = conn.Write(ctx, websocket.MessageText, []byte(initialMessage))
 	if err != nil {
 		return err
@@ -172,14 +171,7 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	handler = newConnectionHandler(c.ctx, conn, c.readTimeout, c.log)
 	c.handlers[handlerID] = handler
 
-	/* go func(handlerID uint64) {
-		handler.startBlocking(sub)
-		c.handlersMu.Lock()
-		delete(c.handlers, handlerID)
-		c.handlersMu.Unlock()
-	}(handlerID) // deduplication implementation */
-
-	go func(handlerID string) {
+	go func(handlerID uint64) {
 		handler.startBlocking(sub)
 		c.handlersMu.Lock()
 		delete(c.handlers, handlerID)
@@ -189,12 +181,12 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	return nil
 }
 
-// generateHandlerIDHash generates a Hash based on: URL, Headers, Body to uniquely identify Upgrade Requests
-/*func (c *WebSocketGraphQLSubscriptionClient) generateHandlerIDHash(options GraphQLSubscriptionOptions) (uint64, error) {
+// generateHandlerIDHash generates a Hash based on: URL and Headers to uniquely identify Upgrade Requests
+func (c *WebSocketGraphQLSubscriptionClient) generateHandlerIDHash(options GraphQLSubscriptionOptions) (uint64, error) {
 	var (
 		err error
 	)
-	xxh := c.hashPool.Get().(*xxhash.XXHash64)
+	xxh := c.hashPool.Get().(*xxhash.Digest)
 	defer c.hashPool.Put(xxh)
 	xxh.Reset()
 
@@ -208,20 +200,18 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	}
 
 	return xxh.Sum64(), nil
-} // deduplication implementation */
+}
 
-func (c *WebSocketGraphQLSubscriptionClient) generateNonDeduplicationID() (string, error) {
-	for {
-		u, err := uuid.NewRandom()
-		if err != nil {
-			return "", err
-		}
+func (c *WebSocketGraphQLSubscriptionClient) handleClosedConnectionHandler(ctx context.Context, next chan<- []byte) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
 
-		uuidString := u.String()
-		if _, ok := c.handlers[uuidString]; !ok {
-			return uuidString, nil
-		}
+	select {
+	case next <- []byte(connectionError):
+	case <-ctx.Done():
 	}
+
+	close(next)
 }
 
 func newConnectionHandler(ctx context.Context, conn *websocket.Conn, readTimeout time.Duration, log abstractlogger.Logger) *connectionHandler {
@@ -233,6 +223,7 @@ func newConnectionHandler(ctx context.Context, conn *websocket.Conn, readTimeout
 		nextSubscriptionID: 0,
 		subscriptions:      map[string]subscription{},
 		readTimeout:        readTimeout,
+		connectionDoneCh:   make(chan struct{}),
 	}
 }
 
@@ -247,6 +238,7 @@ type connectionHandler struct {
 	nextSubscriptionID int
 	subscriptions      map[string]subscription
 	readTimeout        time.Duration
+	connectionDoneCh   chan struct{}
 }
 
 type subscription struct {
@@ -262,10 +254,14 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 	defer func() {
 		h.unsubscribeAllAndCloseConn()
 		cancel()
+		close(h.connectionDoneCh)
 	}()
 	h.subscribe(sub)
 	dataCh := make(chan []byte)
-	go h.readBlocking(readCtx, dataCh)
+	errCh := make(chan error, 1)
+
+	go func() { errCh <- h.readBlocking(readCtx, dataCh) }()
+
 	for {
 		if h.ctx.Err() != nil {
 			return
@@ -277,6 +273,12 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 		select {
 		case <-time.After(h.readTimeout):
 			continue
+		case readErr := <-errCh:
+			if readErr != nil {
+				h.log.Info("Got an error from WS reader", abstractlogger.String("message", readErr.Error()))
+				h.handleMessageTypeConnectionError()
+				return
+			}
 		case sub = <-h.subscribeCh:
 			h.subscribe(sub)
 		case data := <-dataCh:
@@ -305,14 +307,14 @@ func (h *connectionHandler) startBlocking(sub subscription) {
 // readBlocking is a dedicated loop running in a separate goroutine
 // because the library "nhooyr.io/websocket" doesn't allow reading with a context with Timeout
 // we'll block forever on reading until the context of the connectionHandler stops
-func (h *connectionHandler) readBlocking(ctx context.Context, dataCh chan []byte) {
+func (h *connectionHandler) readBlocking(ctx context.Context, dataCh chan []byte) error {
 	for {
 		msgType, data, err := h.conn.Read(ctx)
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		if err != nil {
-			continue
+			return err
 		}
 		if msgType != websocket.MessageText {
 			continue
@@ -320,7 +322,7 @@ func (h *connectionHandler) readBlocking(ctx context.Context, dataCh chan []byte
 		select {
 		case dataCh <- data:
 		case <-ctx.Done():
-			return
+			return nil
 		}
 	}
 }
