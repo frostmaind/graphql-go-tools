@@ -1131,7 +1131,7 @@ func (c *configurationVisitor) isChild(plannerConfig *plannerConfiguration, curr
 		return false
 	}
 
-	childPath := strings.TrimLeft(strings.TrimLeft(currentPath, plannerConfig.parentPath), ".")
+	childPath := strings.TrimLeft(currentPath, plannerConfig.parentPath+".")
 	childParts := len(strings.Split(childPath, "."))
 	if childParts == 0 {
 		return false
@@ -1232,13 +1232,13 @@ func (c *configurationVisitor) EnterField(ref int) {
 
 func (c *configurationVisitor) LeaveField(ref int) {
 	if len(c.fieldNames) > 0 {
-		c.fieldNames = c.fieldNames[0:len(c.fieldNames)-1]
+		c.fieldNames = c.fieldNames[0 : len(c.fieldNames)-1]
 	}
 	if len(c.fieldTypes) > 0 {
-		c.fieldTypes = c.fieldTypes[0:len(c.fieldTypes)-1]
+		c.fieldTypes = c.fieldTypes[0 : len(c.fieldTypes)-1]
 	}
 	if len(c.fieldRefs) > 0 {
-		c.fieldRefs = c.fieldRefs[0:len(c.fieldRefs)-1]
+		c.fieldRefs = c.fieldRefs[0 : len(c.fieldRefs)-1]
 	}
 	fieldAliasOrName := c.operation.FieldAliasOrNameString(ref)
 	parent := c.walker.Path.DotDelimitedString()

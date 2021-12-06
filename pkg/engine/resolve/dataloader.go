@@ -2,8 +2,8 @@ package resolve
 
 import (
 	"fmt"
-	"strings"
 	"sync"
+	"strconv"
 
 	"github.com/buger/jsonparser"
 
@@ -120,7 +120,6 @@ func (df *dataLoaderFactory) newDataLoader(initialValue []byte) *dataLoader {
 		buf.Data.WriteBytes(initialValue)
 
 		dataloader.fetches[initialValueID] = &batchFetchState{
-			nextIdxMap:   map[string]int{},
 			fetchError: nil,
 			results:    []*BufPair{buf},
 		}
@@ -162,9 +161,7 @@ func (d *dataLoader) Load(ctx *Context, fetch *SingleFetch, responsePair *BufPai
 		return
 	}
 
-	fetchResult = &batchFetchState{
-		rootResponseElements: ctx.responseElements,
-	}
+	fetchResult = &batchFetchState{}
 
 	parentResult, ok := d.getFetchState(ctx.lastFetchID)
 
@@ -218,9 +215,7 @@ func (d *dataLoader) LoadBatch(ctx *Context, batchFetch *BatchFetch, responsePai
 		return
 	}
 
-	fetchResult = &batchFetchState{
-		rootResponseElements: ctx.responseElements,
-	}
+	fetchResult = &batchFetchState{}
 
 	parentResult, ok := d.getFetchState(ctx.lastFetchID)
 	if !ok {
@@ -267,18 +262,31 @@ func (d *dataLoader) resolveBatchFetch(ctx *Context, batchFetch *BatchFetch, fet
 		results[i] = d.getResultBufPair()
 	}
 
-	fetchState = &batchFetchState{
-		rootResponseElements: ctx.responseElements,
-	}
+	fetchState = &batchFetchState{}
 
 	if err = d.fetcher.FetchBatch(ctx, batchFetch, inputBufs, results); err != nil {
 		fetchState.fetchError = err
 		return fetchState, nil
 	}
 
+	fetchState.rootPath = d.getFetchRootPath(ctx)
 	fetchState.results = results
 
 	return fetchState, nil
+}
+
+func (d *dataLoader) getFetchRootPath(ctx *Context) []string {
+	pathElements := byteSlicesToStringSlice(ctx.pathElements)
+
+	if len(ctx.responseElements) == 0 {
+		return pathElements
+	}
+
+	if ctx.responseElements[len(ctx.responseElements)-1] == arrayElementKey {
+		pathElements = pathElements[:len(pathElements)-1]
+	}
+
+	return pathElements
 }
 
 func (d *dataLoader) resolveSingleFetch(ctx *Context, fetch *SingleFetch, fetchParams [][]byte) (fetchState *singleFetchState, err error) {
@@ -397,8 +405,7 @@ type fetchState interface {
 }
 
 type batchFetchState struct {
-	rootResponseElements []string
-	nextIdxMap map[string]int
+	rootPath []string
 
 	fetchError error
 	results    []*BufPair
@@ -424,15 +431,20 @@ func (b *batchFetchState) next(ctx *Context) (*BufPair, error) {
 		return nil, b.fetchError
 	}
 
-	responseElemKey := strings.Join(ctx.responseElements, ".")
-	nextIdx := b.nextIdxMap[responseElemKey]
+	currentPath := byteSlicesToStringSlice(ctx.pathElements)
+	resolvePath := currentPath[len(b.rootPath):]
+	idx, err := strconv.Atoi(resolvePath[0])
+	if err != nil {
+		return nil, err
+	}
 
-	if
-	res := b.results[b.nextIdx]
+	rootJSON := b.results[idx].Data.Bytes()
+	jsonPath := convertTOJSONPath(resolvePath[1:], ctx.responseElements[1:])
+	val, _,_, err := jsonparser.Get(rootJSON, jsonPath...)
 
-	b.nextIdxMap[responseElemKey]++
-
-	return res, nil
+	bufPair := NewBufPair()
+	bufPair.Data.WriteBytes(val)
+	return bufPair, nil
 }
 
 type singleFetchState struct {
@@ -491,4 +503,28 @@ func copyBufPair(to, from *BufPair) {
 
 	to.Data.WriteBytes(from.Data.Bytes())
 	to.Errors.WriteBytes(from.Errors.Bytes())
+}
+
+func byteSlicesToStringSlice(in [][]byte) []string {
+	res := make([]string, len(in))
+
+	for i := range in {
+		res[i] = string(in[i])
+	}
+
+	return res
+}
+
+func convertTOJSONPath(currentPath, responsePath []string) []string {
+	out := make([]string, len(currentPath))
+
+	for i := range currentPath {
+		if responsePath[i] == arrayElementKey {
+			out[i] = "["+currentPath[i]+"]"
+		} else {
+			out[i] = currentPath[i]
+		}
+	}
+
+	return out
 }
