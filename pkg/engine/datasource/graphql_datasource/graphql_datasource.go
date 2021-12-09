@@ -76,6 +76,7 @@ func (p *Planner) DataSourcePlanningBehavior() plan.DataSourcePlanningBehavior {
 	return plan.DataSourcePlanningBehavior{
 		MergeAliasedRootNodes:      true,
 		OverrideFieldPathFromAlias: true,
+		SupportProvidesDirective:   true,
 	}
 }
 

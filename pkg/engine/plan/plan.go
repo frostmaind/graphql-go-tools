@@ -386,12 +386,13 @@ func (v *Visitor) EnterSelectionSet(ref int) {
 }
 
 func (v *Visitor) EnterField(ref int) {
-	fieldName := v.Operation.FieldNameBytes(ref)
-	fieldAliasOrName := v.Operation.FieldAliasOrNameBytes(ref)
 
 	if v.skipField(ref) {
 		return
 	}
+
+	fieldName := v.Operation.FieldNameBytes(ref)
+	fieldAliasOrName := v.Operation.FieldAliasOrNameBytes(ref)
 
 	if bytes.Equal(fieldName, literal.TYPENAME) {
 		v.currentField = &resolve.Field{
@@ -439,16 +440,12 @@ func (v *Visitor) EnterField(ref int) {
 	path := v.resolveFieldPath(ref)
 	fieldDefinitionType := v.Definition.FieldDefinitionType(fieldDefinition)
 	bufferID, hasBuffer := v.fieldBuffers[ref]
-	if fieldAliasOrName.String() == "oddsQA" {
-		_ = fieldAliasOrName
-	}
-	onTypeName := v.resolveOnTypeName()
 	v.currentField = &resolve.Field{
 		Name:       fieldAliasOrName,
 		Value:      v.resolveFieldValue(ref, fieldDefinitionType, true, path),
 		HasBuffer:  hasBuffer,
 		BufferID:   bufferID,
-		OnTypeName: onTypeName,
+		OnTypeName: v.resolveOnTypeName(),
 		Position: resolve.Position{
 			Line:   v.Operation.Fields[ref].Position.LineStart,
 			Column: v.Operation.Fields[ref].Position.CharStart,
@@ -635,9 +632,6 @@ func (v *Visitor) resolveFieldPath(ref int) []string {
 
 	for i := range v.Config.Fields {
 		if v.Config.Fields[i].TypeName == typeName && v.Config.Fields[i].FieldName == fieldName {
-			if typeName == "SportEventMarket" && fieldName == "oddsQA" {
-				_ = fieldName
-			}
 			if aliasOverride {
 				override, exists := config.planner.DownstreamResponseFieldAlias(ref)
 				if exists {
@@ -941,6 +935,7 @@ type DataSourcePlanningBehavior struct {
 	// When true expected response will be { "rootField": ..., "alias": ... }
 	// When false expected response will be { "rootField": ..., "original": ... }
 	OverrideFieldPathFromAlias bool
+	SupportProvidesDirective   bool
 }
 
 type DataSourcePlanner interface {
@@ -1003,7 +998,6 @@ type configurationVisitor struct {
 	fieldBuffers          map[int]int
 	fieldNames            []string
 	fieldTypes            []string
-	fieldRefs             []int
 
 	ctx context.Context
 }
@@ -1113,6 +1107,27 @@ func (p *plannerConfiguration) hasNode(typeName, fieldName string) bool {
 	return p.hasChildNode(typeName, fieldName)
 }
 
+func (p *plannerConfiguration) childParts(currentPath string) []string {
+	if !strings.HasPrefix(currentPath, p.parentPath) {
+		return nil
+	}
+
+	childPath := strings.TrimPrefix(currentPath, p.parentPath+".")
+	childParts := strings.Split(childPath, ".")
+
+	return childParts
+}
+
+func (p *plannerConfiguration) addRecursivelyPath(currentPath string) {
+	childParts := p.childParts(currentPath)
+
+	prefix := p.parentPath
+	for i := range childParts {
+		prefix = prefix + "." + childParts[i]
+		p.paths = append(p.paths, pathConfiguration{path: prefix})
+	}
+}
+
 type pathConfiguration struct {
 	path              string
 	exitPlannerOnNode bool
@@ -1127,18 +1142,13 @@ func (c *configurationVisitor) EnterOperationDefinition(ref int) {
 }
 
 func (c *configurationVisitor) isChild(plannerConfig *plannerConfiguration, currentPath string) bool {
-	if !strings.HasPrefix(currentPath, plannerConfig.parentPath) {
+	childPartsLen := len(plannerConfig.childParts(currentPath))
+	if childPartsLen == 0 {
 		return false
 	}
 
-	childPath := strings.TrimLeft(currentPath, plannerConfig.parentPath+".")
-	childParts := len(strings.Split(childPath, "."))
-	if childParts == 0 {
-		return false
-	}
-
-	childFields := c.fieldNames[len(c.fieldNames)-childParts:]
-	childTypes := c.fieldTypes[len(c.fieldTypes)-childParts:]
+	childFields := c.fieldNames[len(c.fieldNames)-childPartsLen:]
+	childTypes := c.fieldTypes[len(c.fieldTypes)-childPartsLen:]
 
 	for i := range childFields {
 		if !plannerConfig.hasNode(childTypes[i], childFields[i]) {
@@ -1150,17 +1160,11 @@ func (c *configurationVisitor) isChild(plannerConfig *plannerConfiguration, curr
 }
 
 func (c *configurationVisitor) EnterField(ref int) {
-	var parentRef int
-	if len(c.fieldRefs) > 0 {
-		parentRef = c.fieldRefs[len(c.fieldRefs)-1]
-		_ = parentRef
-	}
 	fieldName := c.operation.FieldNameUnsafeString(ref)
 	c.fieldNames = append(c.fieldNames, fieldName)
 	fieldAliasOrName := c.operation.FieldAliasOrNameString(ref)
 	typeName := c.walker.EnclosingTypeDefinition.NameString(c.definition)
 	c.fieldTypes = append(c.fieldTypes, typeName)
-	c.fieldRefs = append(c.fieldRefs, ref)
 	parent := c.walker.Path.DotDelimitedString()
 	current := parent + "." + fieldAliasOrName
 	root := c.walker.Ancestors[0]
@@ -1168,11 +1172,9 @@ func (c *configurationVisitor) EnterField(ref int) {
 		return
 	}
 	isSubscription := c.isSubscription(root.Ref, current)
-	if fieldAliasOrName == "oddName" {
-		_ = fieldAliasOrName
-	}
 	for i, planner := range c.planners {
-		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
+		planningBehavior := planner.planner.DataSourcePlanningBehavior()
+		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) && planningBehavior.MergeAliasedRootNodes {
 			// same parent + root node = root sibling
 			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
 			c.fieldBuffers[ref] = planner.bufferID
@@ -1183,10 +1185,8 @@ func (c *configurationVisitor) EnterField(ref int) {
 			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
 			return
 		}
-		if c.isChild(&planner, current) {
-			// @TODO add recursively
-			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: parent})
-			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
+		if planningBehavior.SupportProvidesDirective && c.isChild(&planner, current) {
+			c.planners[i].addRecursivelyPath(current)
 			c.fieldBuffers[ref] = planner.bufferID
 			c.fetches = append(c.fetches, objectFetchConfiguration{
 				bufferID:       planner.bufferID,
@@ -1237,9 +1237,6 @@ func (c *configurationVisitor) LeaveField(ref int) {
 	if len(c.fieldTypes) > 0 {
 		c.fieldTypes = c.fieldTypes[0 : len(c.fieldTypes)-1]
 	}
-	if len(c.fieldRefs) > 0 {
-		c.fieldRefs = c.fieldRefs[0 : len(c.fieldRefs)-1]
-	}
 	fieldAliasOrName := c.operation.FieldAliasOrNameString(ref)
 	parent := c.walker.Path.DotDelimitedString()
 	current := parent + "." + fieldAliasOrName
@@ -1280,11 +1277,6 @@ func (c *configurationVisitor) EnterDocument(operation, definition *ast.Document
 		c.fieldTypes = make([]string, 0, 8)
 	} else {
 		c.fieldTypes = c.fieldTypes[:0]
-	}
-	if c.fieldRefs == nil {
-		c.fieldRefs = make([]int, 0, 8)
-	} else {
-		c.fieldRefs = c.fieldRefs[:8]
 	}
 }
 
