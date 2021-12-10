@@ -23,6 +23,8 @@ const (
 	connectionError       = `{"errors":[{"message":"connection error"}]}`
 )
 
+const connectionInitTimeout = 3 * time.Second
+
 // WebSocketGraphQLSubscriptionClient is a WebSocket client that allows running multiple subscriptions via the same WebSocket Connection
 // It takes care of de-duplicating WebSocket connections to the same origin under certain circumstances
 // If Hash(URL,Body,Headers) result in the same result, an existing WS connection is re-used
@@ -130,7 +132,10 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	options.Header.Set("Sec-WebSocket-Protocol", "graphql-ws")
 	options.Header.Set("Sec-WebSocket-Version", "13")
 
-	conn, upgradeResponse, err := websocket.Dial(ctx, options.URL, &websocket.DialOptions{
+	connectionInitCtx, cancelConnectionInitCtx := context.WithTimeout(ctx, connectionInitTimeout)
+	defer cancelConnectionInitCtx()
+
+	conn, upgradeResponse, err := websocket.Dial(connectionInitCtx, options.URL, &websocket.DialOptions{
 		HTTPClient:      c.httpClient,
 		HTTPHeader:      options.Header,
 		CompressionMode: websocket.CompressionDisabled,
@@ -149,11 +154,11 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 
 	// init + ack
 	initialMessage := fmt.Sprintf(connectionInitMessage, string(initialPayload))
-	err = conn.Write(ctx, websocket.MessageText, []byte(initialMessage))
+	err = conn.Write(connectionInitCtx, websocket.MessageText, []byte(initialMessage))
 	if err != nil {
 		return err
 	}
-	msgType, connectionAckMsg, err := conn.Read(ctx)
+	msgType, connectionAckMsg, err := conn.Read(connectionInitCtx)
 	if err != nil {
 		return err
 	}
