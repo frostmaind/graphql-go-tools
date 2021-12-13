@@ -127,10 +127,6 @@ func (e *internalExecutionContext) setOperationRequest(operationRequest *Request
 	e.resolveContext.Request = operationRequest.request
 }
 
-func (e *internalExecutionContext) setRequest(request resolve.Request) {
-	e.resolveContext.Request = request
-}
-
 func (e *internalExecutionContext) setContext(ctx context.Context) {
 	e.resolveContext.Context = ctx
 }
