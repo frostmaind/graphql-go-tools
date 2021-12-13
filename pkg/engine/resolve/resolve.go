@@ -108,6 +108,9 @@ type HookContext struct {
 	CurrentPath []byte
 }
 
+type RootResolver func(ctx *Context, writer io.Writer) error
+type RootFieldMiddleware func(next RootResolver) RootResolver
+
 type BeforeFetchHook interface {
 	OnBeforeFetch(ctx HookContext, input []byte)
 }
@@ -119,20 +122,22 @@ type AfterFetchHook interface {
 
 type Context struct {
 	context.Context
-	Variables        []byte
-	Request          Request
-	pathElements     [][]byte
-	responseElements []string
-	lastFetchID      int
-	patches          []patch
-	usedBuffers      []*bytes.Buffer
-	currentPatch     int
-	maxPatch         int
-	pathPrefix       []byte
-	dataLoader       *dataLoader
-	beforeFetchHook  BeforeFetchHook
-	afterFetchHook   AfterFetchHook
-	position         Position
+	OperationName     string
+	OperationDocument *ast.Document // Operation document is readonly, it's not expected to modify the field
+	Variables         []byte
+	Request           Request
+	pathElements      [][]byte
+	responseElements  []string
+	lastFetchID       int
+	patches           []patch
+	usedBuffers       []*bytes.Buffer
+	currentPatch      int
+	maxPatch          int
+	pathPrefix        []byte
+	dataLoader        *dataLoader
+	beforeFetchHook   BeforeFetchHook
+	afterFetchHook    AfterFetchHook
+	position          Position
 }
 
 type Request struct {
@@ -141,16 +146,17 @@ type Request struct {
 
 func NewContext(ctx context.Context) *Context {
 	return &Context{
-		Context:      ctx,
-		Variables:    make([]byte, 0, 4096),
-		pathPrefix:   make([]byte, 0, 4096),
-		pathElements: make([][]byte, 0, 16),
-		patches:      make([]patch, 0, 48),
-		usedBuffers:  make([]*bytes.Buffer, 0, 48),
-		currentPatch: -1,
-		maxPatch:     -1,
-		position:     Position{},
-		dataLoader:   nil,
+		Context:           ctx,
+		OperationDocument: nil,
+		Variables:         make([]byte, 0, 4096),
+		pathPrefix:        make([]byte, 0, 4096),
+		pathElements:      make([][]byte, 0, 16),
+		patches:           make([]patch, 0, 48),
+		usedBuffers:       make([]*bytes.Buffer, 0, 48),
+		currentPatch:      -1,
+		maxPatch:          -1,
+		position:          Position{},
+		dataLoader:        nil,
 	}
 }
 
@@ -177,18 +183,20 @@ func (c *Context) Clone() Context {
 		copy(patches[i].data, c.patches[i].data)
 	}
 	return Context{
-		Context:         c.Context,
-		Variables:       variables,
-		Request:         c.Request,
-		pathElements:    pathElements,
-		patches:         patches,
-		usedBuffers:     make([]*bytes.Buffer, 0, 48),
-		currentPatch:    c.currentPatch,
-		maxPatch:        c.maxPatch,
-		pathPrefix:      pathPrefix,
-		beforeFetchHook: c.beforeFetchHook,
-		afterFetchHook:  c.afterFetchHook,
-		position:        c.position,
+		Context:           c.Context,
+		Variables:         variables,
+		Request:           c.Request,
+		pathElements:      pathElements,
+		patches:           patches,
+		usedBuffers:       make([]*bytes.Buffer, 0, 48),
+		currentPatch:      c.currentPatch,
+		maxPatch:          c.maxPatch,
+		pathPrefix:        pathPrefix,
+		beforeFetchHook:   c.beforeFetchHook,
+		afterFetchHook:    c.afterFetchHook,
+		position:          c.position,
+		OperationDocument: c.OperationDocument,
+		OperationName: c.OperationName,
 	}
 }
 
@@ -209,6 +217,8 @@ func (c *Context) Free() {
 	c.Request.Header = nil
 	c.position = Position{}
 	c.dataLoader = nil
+	c.OperationDocument = nil
+	c.OperationName = ""
 }
 
 func (c *Context) SetBeforeFetchHook(hook BeforeFetchHook) {
@@ -329,6 +339,8 @@ type Resolver struct {
 	hash64Pool        sync.Pool
 	dataloaderFactory *dataLoaderFactory
 	fetcher           *Fetcher
+
+	rootFieldMiddleware RootFieldMiddleware
 }
 
 type inflightFetch struct {
@@ -388,7 +400,14 @@ func New(ctx context.Context, fetcher *Fetcher, enableDataLoader bool) *Resolver
 		dataloaderFactory: newDataloaderFactory(fetcher),
 		fetcher:           fetcher,
 		EnableDataloader:  enableDataLoader,
+		rootFieldMiddleware: func(next RootResolver) RootResolver {
+			return next
+		},
 	}
+}
+
+func (r *Resolver) SetRootFieldMiddleware(mw RootFieldMiddleware) {
+	r.rootFieldMiddleware = mw
 }
 
 func (r *Resolver) resolveNode(ctx *Context, node Node, data []byte, bufPair *BufPair) (err error) {
@@ -473,40 +492,44 @@ func extractResponse(responseData []byte, bufPair *BufPair, cfg ProcessResponseC
 	}, responsePaths...)
 }
 
-func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer) (err error) {
-	buf := r.getBufPair()
-	defer r.freeBufPair(buf)
+func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer) error {
+	rootFieldHandler := r.rootFieldMiddleware(func(ctx *Context, writer io.Writer) (err error) {
+		buf := r.getBufPair()
+		defer r.freeBufPair(buf)
 
-	responseBuf := r.getBufPair()
-	defer r.freeBufPair(responseBuf)
+		responseBuf := r.getBufPair()
+		defer r.freeBufPair(responseBuf)
 
-	extractResponse(data, responseBuf, ProcessResponseConfig{ExtractGraphqlResponse: true})
+		extractResponse(data, responseBuf, ProcessResponseConfig{ExtractGraphqlResponse: true})
 
-	if data != nil {
-		ctx.lastFetchID = initialValueID
-	}
-
-	if r.EnableDataloader {
-		ctx.dataLoader = r.dataloaderFactory.newDataLoader(responseBuf.Data.Bytes())
-		defer func() {
-			r.dataloaderFactory.freeDataLoader(ctx.dataLoader)
-			ctx.dataLoader = nil
-		}()
-	}
-
-	ignoreData := false
-	err = r.resolveNode(ctx, response.Data, responseBuf.Data.Bytes(), buf)
-	if err != nil {
-		if !errors.Is(err, errNonNullableFieldValueIsNull) {
-			return
+		if data != nil {
+			ctx.lastFetchID = initialValueID
 		}
-		ignoreData = true
-	}
-	if responseBuf.Errors.Len() > 0 {
-		r.MergeBufPairErrors(responseBuf, buf)
-	}
 
-	return writeGraphqlResponse(buf, writer, ignoreData)
+		if r.EnableDataloader {
+			ctx.dataLoader = r.dataloaderFactory.newDataLoader(responseBuf.Data.Bytes())
+			defer func() {
+				r.dataloaderFactory.freeDataLoader(ctx.dataLoader)
+				ctx.dataLoader = nil
+			}()
+		}
+
+		ignoreData := false
+		err = r.resolveNode(ctx, response.Data, responseBuf.Data.Bytes(), buf)
+		if err != nil {
+			if !errors.Is(err, errNonNullableFieldValueIsNull) {
+				return
+			}
+			ignoreData = true
+		}
+		if responseBuf.Errors.Len() > 0 {
+			r.MergeBufPairErrors(responseBuf, buf)
+		}
+
+		return writeGraphqlResponse(buf, writer, ignoreData)
+	})
+
+	return rootFieldHandler(ctx, writer)
 }
 
 func (r *Resolver) ResolveGraphQLSubscription(ctx *Context, subscription *GraphQLSubscription, writer FlushWriter) (err error) {
@@ -733,7 +756,7 @@ func (r *Resolver) resolveArray(ctx *Context, array *Array, data []byte, arrayBu
 
 	_, err = jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 		if err == nil && dataType == jsonparser.String {
-			value = data[offset-2:offset+len(value)] // add quotes to string values
+			value = data[offset-2 : offset+len(value)] // add quotes to string values
 		}
 
 		*arrayItems = append(*arrayItems, value)
@@ -985,7 +1008,7 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 	if len(object.Path) != 0 {
 		data, _, _, _ = jsonparser.Get(data, object.Path...)
 
-		if len(data) == 0 || bytes.Equal(data, literal.NULL){
+		if len(data) == 0 || bytes.Equal(data, literal.NULL) {
 			if object.Nullable {
 				r.resolveNull(objectBuf.Data)
 				return
@@ -1335,7 +1358,6 @@ func (i *InputTemplate) renderObjectVariable(variables []byte, segment TemplateS
 	}
 	return renderGraphQLValue(value, segment.VariableValueType, segment.OmitObjectKeyQuotes, segment.EscapeQuotes, preparedInput)
 }
-
 
 func (i *InputTemplate) renderContextVariable(ctx *Context, segment TemplateSegment, preparedInput *fastbuffer.FastBuffer) error {
 	value, valueType, _, err := jsonparser.Get(ctx.Variables, segment.VariableSourcePath...)

@@ -115,10 +115,16 @@ func newInternalExecutionContext() *internalExecutionContext {
 	}
 }
 
-func (e *internalExecutionContext) prepare(ctx context.Context, variables []byte, request resolve.Request) {
+func (e *internalExecutionContext) prepare(ctx context.Context, operationRequest *Request) {
 	e.setContext(ctx)
-	e.setVariables(variables)
-	e.setRequest(request)
+	e.setOperationRequest(operationRequest)
+}
+
+func (e *internalExecutionContext) setOperationRequest(operationRequest *Request) {
+	e.resolveContext.Variables = operationRequest.Variables
+	e.resolveContext.OperationDocument, _ = operationRequest.OperationDocument()
+	e.resolveContext.OperationName = operationRequest.OperationName
+	e.resolveContext.Request = operationRequest.request
 }
 
 func (e *internalExecutionContext) setRequest(request resolve.Request) {
@@ -127,10 +133,6 @@ func (e *internalExecutionContext) setRequest(request resolve.Request) {
 
 func (e *internalExecutionContext) setContext(ctx context.Context) {
 	e.resolveContext.Context = ctx
-}
-
-func (e *internalExecutionContext) setVariables(variables []byte) {
-	e.resolveContext.Variables = variables
 }
 
 func (e *internalExecutionContext) reset() {
@@ -146,6 +148,7 @@ type ExecutionEngineV2 struct {
 	internalExecutionContextPool sync.Pool
 	executionPlanCache           *lru.Cache
 	operationMiddleware          OperationMiddleware
+	//rootFieldMiddleware          resolve.RootFieldMiddleware
 }
 
 type WebsocketBeforeStartHook interface {
@@ -175,12 +178,15 @@ func NewExecutionEngineV2(ctx context.Context, logger abstractlogger.Logger, eng
 		return nil, err
 	}
 	fetcher := resolve.NewFetcher(engineConfig.dataLoaderConfig.EnableSingleFlightLoader)
+	rootFieldMiddleware := processRootFieldMiddleware(engineConfig.rootFieldMiddleware...)
+	resolver := resolve.New(ctx, fetcher, engineConfig.dataLoaderConfig.EnableDataLoader)
+	resolver.SetRootFieldMiddleware(rootFieldMiddleware)
 
 	return &ExecutionEngineV2{
 		logger:   logger,
 		config:   engineConfig,
 		planner:  plan.NewPlanner(ctx, engineConfig.plannerConfig),
-		resolver: resolve.New(ctx, fetcher, engineConfig.dataLoaderConfig.EnableDataLoader),
+		resolver: resolver,
 		internalExecutionContextPool: sync.Pool{
 			New: func() interface{} {
 				return newInternalExecutionContext()
@@ -215,7 +221,7 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 		execContext := e.getExecutionCtx()
 		defer e.putExecutionCtx(execContext)
 
-		execContext.prepare(ctx, operation.Variables, operation.request)
+		execContext.prepare(ctx, operation)
 
 		for i := range options {
 			options[i](execContext)
@@ -300,6 +306,23 @@ func processOperationMiddleware(middlewares ...OperationMiddleware) OperationMid
 		previousMW := middleware
 		currentMW := middlewares[i]
 		middleware = func(next OperationHandler) OperationHandler {
+			return previousMW(currentMW(next))
+		}
+	}
+
+	return middleware
+}
+
+func processRootFieldMiddleware(middlewares ...resolve.RootFieldMiddleware) resolve.RootFieldMiddleware {
+	middleware := resolve.RootFieldMiddleware(func(next resolve.RootResolver) resolve.RootResolver {
+		return next
+	})
+
+	// the first middleware is the outer most middleware and runs first.
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		previousMW := middleware
+		currentMW := middlewares[i]
+		middleware = func(next resolve.RootResolver) resolve.RootResolver {
 			return previousMW(currentMW(next))
 		}
 	}

@@ -17,7 +17,8 @@ type EngineV2Configuration struct {
 	schema                   *Schema
 	plannerConfig            plan.Configuration
 	websocketBeforeStartHook WebsocketBeforeStartHook
-	dataLoaderConfig dataLoaderConfig
+	dataLoaderConfig         dataLoaderConfig
+	rootFieldMiddleware      []resolve.RootFieldMiddleware
 }
 
 func NewEngineV2Configuration(schema *Schema) EngineV2Configuration {
@@ -32,12 +33,17 @@ func NewEngineV2Configuration(schema *Schema) EngineV2Configuration {
 			EnableSingleFlightLoader: false,
 			EnableDataLoader:         false,
 		},
+		rootFieldMiddleware: nil,
 	}
 }
 
 type dataLoaderConfig struct {
 	EnableSingleFlightLoader bool
 	EnableDataLoader         bool
+}
+
+func (e *EngineV2Configuration) AddRootFieldMiddleware(mw resolve.RootFieldMiddleware) {
+	e.rootFieldMiddleware = append(e.rootFieldMiddleware, mw)
 }
 
 func (e *EngineV2Configuration) AddDataSource(dataSource plan.DataSourceConfiguration) {
@@ -83,13 +89,13 @@ func newGraphQLDataSourceV2Generator(document *ast.Document) *graphqlDataSourceV
 	}
 }
 
-func (d *graphqlDataSourceV2Generator) Generate(config graphqlDataSource.Configuration,batchFactory resolve.DataSourceBatchFactory, httpClient *http.Client) plan.DataSourceConfiguration {
+func (d *graphqlDataSourceV2Generator) Generate(config graphqlDataSource.Configuration, batchFactory resolve.DataSourceBatchFactory, httpClient *http.Client) plan.DataSourceConfiguration {
 	var planDataSource plan.DataSourceConfiguration
 	extractor := plan.NewLocalTypeFieldExtractor(d.document)
 	planDataSource.RootNodes, planDataSource.ChildNodes = extractor.GetAllNodes()
 
 	factory := &graphqlDataSource.Factory{
-		HTTPClient: httpClient,
+		HTTPClient:   httpClient,
 		BatchFactory: batchFactory,
 	}
 
