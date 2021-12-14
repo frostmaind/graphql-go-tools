@@ -3050,7 +3050,7 @@ func TestExecutionValidation(t *testing.T) {
 						}
 						`, Values(), Invalid)
 			})
-			t.Run("complex nested requiredListOfRequiredStrings must not be empty", func(t *testing.T) {
+			t.Run("complex nested requiredListOfRequiredStrings could be empty", func(t *testing.T) {
 				run(`
 						{
 							nested(input: {
@@ -3059,7 +3059,7 @@ func TestExecutionValidation(t *testing.T) {
 								requiredListOfRequiredStrings: []
 							})
 						}
-						`, Values(), Invalid)
+						`, Values(), Valid)
 			})
 			t.Run("complex 2x nested", func(t *testing.T) {
 				run(`

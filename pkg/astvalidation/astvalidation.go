@@ -815,9 +815,6 @@ func (v *valuesVisitor) valueSatisfiesListType(value ast.Value, listType int) bo
 	}
 
 	if v.definition.Types[listType].TypeKind == ast.TypeKindNonNull {
-		if len(v.operation.ListValues[value.Ref].Refs) == 0 {
-			return false
-		}
 		listType = v.definition.Types[listType].OfType
 	}
 
