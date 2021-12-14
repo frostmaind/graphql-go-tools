@@ -987,7 +987,7 @@ type Source struct {
 
 func (s *Source) Load(ctx context.Context, input []byte, writer io.Writer) (err error) {
 	variableForDeletion := make([]string, 0, 2)
-	jsonparser.ObjectEach(input, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+	_ = jsonparser.ObjectEach(input, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 		if dataType == jsonparser.Null {
 			variableForDeletion = append(variableForDeletion, string(key))
 		}
