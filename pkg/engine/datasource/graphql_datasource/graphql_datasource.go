@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/buger/jsonparser"
 	"github.com/tidwall/sjson"
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
@@ -985,6 +986,20 @@ type Source struct {
 }
 
 func (s *Source) Load(ctx context.Context, input []byte, writer io.Writer) (err error) {
+	variableForDeletion := make([]string, 0, 2)
+	jsonparser.ObjectEach(input, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+		if dataType == jsonparser.Null {
+			variableForDeletion = append(variableForDeletion, string(key))
+		}
+
+		return nil
+	}, "body", "variables")
+
+	for i := range variableForDeletion {
+		input = jsonparser.Delete(input, "body", "variables", variableForDeletion[i])
+	}
+
+
 	return httpclient.Do(s.httpClient, ctx, input, writer)
 }
 
