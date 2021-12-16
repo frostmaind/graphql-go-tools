@@ -986,20 +986,7 @@ type Source struct {
 }
 
 func (s *Source) Load(ctx context.Context, input []byte, writer io.Writer) (err error) {
-	variableForDeletion := make([]string, 0, 2)
-	_ = jsonparser.ObjectEach(input, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
-		if dataType == jsonparser.Null {
-			variableForDeletion = append(variableForDeletion, string(key))
-		}
-
-		return nil
-	}, "body", "variables")
-
-	for i := range variableForDeletion {
-		input = jsonparser.Delete(input, "body", "variables", variableForDeletion[i])
-	}
-
-
+	input = deleteNullVariables(input, "body", "variables")
 	return httpclient.Do(s.httpClient, ctx, input, writer)
 }
 
@@ -1032,5 +1019,30 @@ func (s *SubscriptionSource) Start(ctx context.Context, input []byte, next chan<
 	if options.Body.Query == "" {
 		return resolve.ErrUnableToResolve
 	}
+
+	options.Body.Variables = deleteNullVariables(options.Body.Variables)
+
 	return s.client.Subscribe(ctx, options, next)
+}
+
+func deleteNullVariables(input []byte, variablePath ...string) []byte {
+	variableForDeletion := make([]string, 0, 2)
+
+	_ = jsonparser.ObjectEach(input, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+		if dataType == jsonparser.Null {
+			variableForDeletion = append(variableForDeletion, string(key))
+		}
+
+		return nil
+	}, variablePath...)
+
+	deletePath := make([]string, len(variablePath)+1)
+	copy(deletePath, variablePath)
+
+	for i := range variableForDeletion {
+		deletePath[len(deletePath)-1] = variableForDeletion[i]
+		input = jsonparser.Delete(input, deletePath...)
+	}
+
+	return input
 }
