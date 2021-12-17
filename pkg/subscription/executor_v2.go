@@ -12,12 +12,17 @@ import (
 
 // ExecutorV2Pool - provides reusable executors
 type ExecutorV2Pool struct {
+	options              []graphql.ExecutionOptionsV2
 	engine               *graphql.ExecutionEngineV2
 	executorPool         *sync.Pool
 	connectionInitReqCtx context.Context // connectionInitReqCtx - holds original request context used to establish websocket connection
 }
 
-func NewExecutorV2Pool(engine *graphql.ExecutionEngineV2, connectionInitReqCtx context.Context) *ExecutorV2Pool {
+func NewExecutorV2Pool(
+	engine *graphql.ExecutionEngineV2,
+	connectionInitReqCtx context.Context,
+	options ...graphql.ExecutionOptionsV2,
+) *ExecutorV2Pool {
 	return &ExecutorV2Pool{
 		engine: engine,
 		executorPool: &sync.Pool{
@@ -25,6 +30,7 @@ func NewExecutorV2Pool(engine *graphql.ExecutionEngineV2, connectionInitReqCtx c
 				return &ExecutorV2{}
 			},
 		},
+		options:              options,
 		connectionInitReqCtx: connectionInitReqCtx,
 	}
 }
@@ -41,6 +47,7 @@ func (e *ExecutorV2Pool) Get(ctx context.Context, payload []byte) (Executor, err
 		operation: &operation,
 		context:   ctx,
 		reqCtx:    e.connectionInitReqCtx,
+		options:   e.options,
 	}, nil
 }
 
@@ -51,6 +58,7 @@ func (e *ExecutorV2Pool) Put(executor Executor) error {
 }
 
 type ExecutorV2 struct {
+	options   []graphql.ExecutionOptionsV2
 	engine    *graphql.ExecutionEngineV2
 	operation *graphql.Request
 	context   context.Context
@@ -58,7 +66,7 @@ type ExecutorV2 struct {
 }
 
 func (e *ExecutorV2) Execute(writer resolve.FlushWriter) error {
-	return e.engine.Execute(e.context, e.operation, writer)
+	return e.engine.Execute(e.context, e.operation, writer, e.options...)
 }
 
 func (e *ExecutorV2) OperationType() ast.OperationType {
