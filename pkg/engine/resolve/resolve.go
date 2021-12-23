@@ -544,7 +544,7 @@ func (r *Resolver) ResolveGraphQLSubscription(ctx *Context, subscription *GraphQ
 	copy(subscriptionInput, rendered)
 	r.freeBufPair(buf)
 
-	c, cancel := context.WithCancel(ctx)
+	c, cancel := context.WithCancel(ctx.Context)
 	defer cancel()
 	resolverDone := r.ctx.Done()
 
