@@ -23,7 +23,7 @@ const (
 	connectionError       = `{"errors":[{"message":"connection error"}]}`
 )
 
-const connectionInitTimeout = 3 * time.Second
+const connectionInitTimeout = 5 * time.Second
 
 // WebSocketGraphQLSubscriptionClient is a WebSocket client that allows running multiple subscriptions via the same WebSocket Connection
 // It takes care of de-duplicating WebSocket connections to the same origin under certain circumstances
