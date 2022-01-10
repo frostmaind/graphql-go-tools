@@ -261,14 +261,15 @@ func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operati
 
 	cacheKey := hash.Sum64()
 
+	e.plannerMu.Lock()
+	defer e.plannerMu.Unlock()
+
 	if cached, ok := e.executionPlanCache.Get(cacheKey); ok {
 		if p, ok := cached.(plan.Plan); ok {
 			return p
 		}
 	}
 
-	e.plannerMu.Lock()
-	defer e.plannerMu.Unlock()
 	planResult := e.planner.Plan(operation, definition, operationName, report)
 	if report.HasErrors() {
 		return nil
