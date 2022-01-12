@@ -3,6 +3,7 @@ package graphql
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
+	"github.com/jensneuse/graphql-go-tools/pkg/astprinter"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
@@ -119,7 +121,20 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 	if r.DocumentCache != nil {
 		if cached, ok := r.DocumentCache.Get(cacheKey); ok {
 			if doc, ok := cached.(*ast.Document); ok {
-				r.document = *doc.Clone()
+				cloned := doc.Clone()
+				r.document = *cloned
+
+				clonedStr, _ := astprinter.PrintStringIndent(cloned, nil, " ")
+				actual, _ := astparser.ParseGraphqlDocumentString(r.Query)
+				actualStr, _ := astprinter.PrintStringIndent(&actual, nil, " ")
+				if clonedStr != actualStr {
+					fmt.Println("THERE IS DIFF", r.OperationName)
+					fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+					fmt.Println("CLONED", clonedStr)
+					fmt.Print("\n\n")
+					fmt.Println("ACTUAL", actualStr)
+				}
+
 				return report
 			}
 		}
@@ -128,7 +143,8 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
 
 	if r.DocumentCache != nil && !report.HasErrors() {
-		r.DocumentCache.Add(cacheKey, &r.document)
+		cloned := r.document.Clone()
+		r.DocumentCache.Add(cacheKey, cloned)
 	}
 
 	return report

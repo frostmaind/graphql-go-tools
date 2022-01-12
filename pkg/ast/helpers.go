@@ -19,5 +19,5 @@ func deleteRef(refs *[]int, index int) {
 func cloneRefs(refs []int) []int {
 	copied := make([]int, len(refs))
 	copy(copied, refs)
-	return refs
+	return copied
 }

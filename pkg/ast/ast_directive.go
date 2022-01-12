@@ -13,9 +13,9 @@ type DirectiveList struct {
 }
 
 func (d DirectiveList) Clone() DirectiveList {
-	refs := make([]int, len(d.Refs))
-	copy(refs, d.Refs)
-	return DirectiveList{Refs: refs}
+	return DirectiveList{
+		Refs: cloneRefs(d.Refs),
+	}
 }
 
 type Directive struct {
@@ -30,7 +30,7 @@ func (d Directive) Clone() Directive {
 		At:           d.At,
 		Name:         d.Name,
 		HasArguments: d.HasArguments,
-		Arguments: d.Arguments.Clone(),
+		Arguments:    d.Arguments.Clone(),
 	}
 }
 
