@@ -7,11 +7,14 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/ast"
 	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
+	"github.com/jensneuse/graphql-go-tools/pkg/pool"
 )
 
 const (
@@ -44,6 +47,8 @@ type Request struct {
 	request      resolve.Request
 
 	validForSchema map[uint64]ValidationResult
+
+	DocumentCache *lru.Cache
 }
 
 func UnmarshalRequest(reader io.Reader, request *Request) error {
@@ -103,8 +108,26 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 		return report
 	}
 
+	hash := pool.Hash64.Get()
+	hash.Reset()
+	defer pool.Hash64.Put(hash)
+	_, _ = hash.Write([]byte(r.Query))
+	cacheKey := hash.Sum64()
+
 	r.isParsed = true
+
+	if cached, ok := r.documentCache.Get(cacheKey); ok {
+		if doc, ok := cached.(*ast.Document); ok {
+			r.document = *doc.Clone()
+			return report
+		}
+	}
+
 	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
+	if !report.HasErrors() {
+		r.documentCache.Add(cacheKey, r.document)
+	}
+
 	return report
 }
 
