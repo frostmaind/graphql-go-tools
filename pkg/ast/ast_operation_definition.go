@@ -28,6 +28,20 @@ type OperationDefinition struct {
 	HasSelections          bool
 }
 
+func (o OperationDefinition) Clone() OperationDefinition {
+	return OperationDefinition{
+		OperationType:          o.OperationType,
+		OperationTypeLiteral:   o.OperationTypeLiteral,
+		Name:                   o.Name,
+		HasVariableDefinitions: o.HasVariableDefinitions,
+		VariableDefinitions:    o.VariableDefinitions.Clone(),
+		HasDirectives:          o.HasDirectives,
+		Directives:             o.Directives.Clone(),
+		SelectionSet:           o.SelectionSet,
+		HasSelections:          o.HasSelections,
+	}
+}
+
 func (d *Document) OperationDefinitionHasVariableDefinition(ref int, variableName string) bool {
 	for _, i := range d.OperationDefinitions[ref].VariableDefinitions.Refs {
 		value := d.VariableDefinitions[i].VariableValue.Ref

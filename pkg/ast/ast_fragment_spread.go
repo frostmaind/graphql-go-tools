@@ -15,6 +15,15 @@ type FragmentSpread struct {
 	Directives    DirectiveList // optional, e.g. @foo
 }
 
+func (f FragmentSpread) Clone() FragmentSpread {
+	return FragmentSpread{
+		Spread:        f.Spread,
+		FragmentName:  f.FragmentName,
+		HasDirectives: f.HasDirectives,
+		Directives:    f.Directives.Clone(),
+	}
+}
+
 func (d *Document) FragmentSpreadNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.FragmentSpreads[ref].FragmentName)
 }

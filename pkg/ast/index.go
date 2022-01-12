@@ -40,7 +40,7 @@ func (i *Index) Reset() {
 	}
 }
 
-func (i *Index) Clone() *Index {
+func (i *Index) Clone() Index {
 	queryTypeName := i.QueryTypeName.Clone()
 	mutationTypeName := i.MutationTypeName.Clone()
 	subscriptionTypeName := i.SubscriptionTypeName.Clone()
@@ -58,7 +58,7 @@ func (i *Index) Clone() *Index {
 	mergedTypeExtensions := make([]Node, len(i.MergedTypeExtensions))
 	copy(mergedTypeExtensions, i.MergedTypeExtensions)
 
-	return &Index{
+	return Index{
 		QueryTypeName:           queryTypeName,
 		MutationTypeName:        mutationTypeName,
 		SubscriptionTypeName:    subscriptionTypeName,

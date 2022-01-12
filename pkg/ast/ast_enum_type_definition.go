@@ -25,6 +25,18 @@ type EnumTypeDefinition struct {
 	EnumValuesDefinition    EnumValueDefinitionList // optional, e.g. { NORTH EAST }
 }
 
+func (e EnumTypeDefinition) Clone() EnumTypeDefinition {
+	return EnumTypeDefinition{
+		Description:             e.Description,
+		EnumLiteral:             e.EnumLiteral,
+		Name:                    e.Name,
+		HasDirectives:           e.HasDirectives,
+		Directives:              e.Directives.Clone(),
+		HasEnumValuesDefinition: e.HasEnumValuesDefinition,
+		EnumValuesDefinition:    e.EnumValuesDefinition.Clone(),
+	}
+}
+
 func (d *Document) EnumTypeDefinitionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.EnumTypeDefinitions[ref].Name)
 }

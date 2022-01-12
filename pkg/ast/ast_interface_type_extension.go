@@ -10,6 +10,13 @@ type InterfaceTypeExtension struct {
 	InterfaceTypeDefinition
 }
 
+func (i InterfaceTypeExtension) Clone() InterfaceTypeExtension {
+	return InterfaceTypeExtension{
+		ExtendLiteral:           i.ExtendLiteral,
+		InterfaceTypeDefinition: i.InterfaceTypeDefinition.Clone(),
+	}
+}
+
 func (d *Document) InterfaceTypeExtensionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.InterfaceTypeExtensions[ref].Name)
 }

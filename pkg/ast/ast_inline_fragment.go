@@ -21,6 +21,17 @@ type InlineFragment struct {
 	HasSelections bool
 }
 
+func (i InlineFragment) Clone() InlineFragment {
+	return InlineFragment{
+		Spread:        i.Spread,
+		TypeCondition: i.TypeCondition,
+		HasDirectives: i.HasDirectives,
+		Directives:    i.Directives.Clone(),
+		SelectionSet:  i.SelectionSet,
+		HasSelections: i.HasSelections,
+	}
+}
+
 func (d *Document) InlineFragmentTypeConditionName(ref int) ByteSlice {
 	if d.InlineFragments[ref].TypeCondition.Type == -1 {
 		return nil

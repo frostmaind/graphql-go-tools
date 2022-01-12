@@ -10,7 +10,13 @@ type RootOperationTypeDefinitionList struct {
 	RBrace position.Position // }
 }
 
-func (r RootOperationTypeDefinitionList) Clone()
+func (r RootOperationTypeDefinitionList) Clone() RootOperationTypeDefinitionList {
+	return RootOperationTypeDefinitionList{
+		LBrace: r.LBrace,
+		Refs:   cloneRefs(r.Refs),
+		RBrace: r.RBrace,
+	}
+}
 
 type RootOperationTypeDefinition struct {
 	OperationType OperationType     // one of query, mutation, subscription

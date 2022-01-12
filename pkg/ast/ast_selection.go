@@ -23,6 +23,14 @@ type SelectionSet struct {
 	SelectionRefs []int
 }
 
+func (s SelectionSet) Clone() SelectionSet {
+	return SelectionSet{
+		LBrace:        s.LBrace,
+		RBrace:        s.RBrace,
+		SelectionRefs: cloneRefs(s.SelectionRefs),
+	}
+}
+
 type Selection struct {
 	Kind SelectionKind // one of Field, FragmentSpread, InlineFragment
 	Ref  int           // reference to the actual selection

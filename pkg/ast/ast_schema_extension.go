@@ -6,3 +6,10 @@ type SchemaExtension struct {
 	ExtendLiteral position.Position
 	SchemaDefinition
 }
+
+func (s SchemaExtension) Clone() SchemaExtension {
+	return SchemaExtension{
+		ExtendLiteral:    s.ExtendLiteral,
+		SchemaDefinition: s.SchemaDefinition.Clone(),
+	}
+}

@@ -10,6 +10,13 @@ type ObjectTypeExtension struct {
 	ObjectTypeDefinition
 }
 
+func (o ObjectTypeExtension) Clone() ObjectTypeExtension {
+	return ObjectTypeExtension{
+		ExtendLiteral:        o.ExtendLiteral,
+		ObjectTypeDefinition: o.ObjectTypeDefinition.Clone(),
+	}
+}
+
 func (d *Document) ObjectTypeExtensionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.ObjectTypeExtensions[ref].Name)
 }

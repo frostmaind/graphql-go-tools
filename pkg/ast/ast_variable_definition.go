@@ -13,6 +13,14 @@ type VariableDefinitionList struct {
 	RPAREN position.Position // )
 }
 
+func (v VariableDefinitionList) Clone() VariableDefinitionList {
+	return VariableDefinitionList{
+		LPAREN: v.LPAREN,
+		Refs:   cloneRefs(v.Refs),
+		RPAREN: v.RPAREN,
+	}
+}
+
 // VariableDefinition
 // example:
 // $devicePicSize: Int = 100 @small
@@ -23,6 +31,17 @@ type VariableDefinition struct {
 	DefaultValue  DefaultValue      // optional, e.g. = "Default"
 	HasDirectives bool
 	Directives    DirectiveList // optional, e.g. @foo
+}
+
+func (v VariableDefinition) Clone() VariableDefinition {
+	return VariableDefinition{
+		VariableValue: v.VariableValue,
+		Colon:         v.Colon,
+		Type:          v.Type,
+		DefaultValue:  v.DefaultValue,
+		HasDirectives: v.HasDirectives,
+		Directives:    v.Directives.Clone(),
+	}
 }
 
 func (d *Document) VariableDefinitionNameBytes(ref int) ByteSlice {

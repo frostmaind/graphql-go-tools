@@ -19,6 +19,19 @@ type UnionTypeDefinition struct {
 	UnionMemberTypes    TypeList // optional, e.g. Photo | Person
 }
 
+func (u UnionTypeDefinition) Clone() UnionTypeDefinition {
+	return UnionTypeDefinition{
+		Description:         u.Description,
+		UnionLiteral:        u.UnionLiteral,
+		Name:                u.Name,
+		HasDirectives:       u.HasDirectives,
+		Directives:          u.Directives.Clone(),
+		Equals:              u.Equals,
+		HasUnionMemberTypes: u.HasUnionMemberTypes,
+		UnionMemberTypes:    u.UnionMemberTypes.Clone(),
+	}
+}
+
 func (d *Document) UnionTypeDefinitionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.UnionTypeDefinitions[ref].Name)
 }

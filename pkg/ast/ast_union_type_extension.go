@@ -10,6 +10,13 @@ type UnionTypeExtension struct {
 	UnionTypeDefinition
 }
 
+func (u UnionTypeExtension) Clone() UnionTypeExtension {
+	return UnionTypeExtension{
+		ExtendLiteral:       u.ExtendLiteral,
+		UnionTypeDefinition: u.UnionTypeDefinition.Clone(),
+	}
+}
+
 func (d *Document) UnionTypeExtensionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.UnionTypeExtensions[ref].Name)
 }

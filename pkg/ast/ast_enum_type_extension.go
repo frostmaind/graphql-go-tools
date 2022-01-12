@@ -10,6 +10,13 @@ type EnumTypeExtension struct {
 	EnumTypeDefinition
 }
 
+func (e EnumTypeExtension) Clone() EnumTypeExtension {
+	return EnumTypeExtension{
+		ExtendLiteral:      e.ExtendLiteral,
+		EnumTypeDefinition: e.EnumTypeDefinition.Clone(),
+	}
+}
+
 func (d *Document) EnumTypeExtensionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.EnumTypeExtensions[ref].Name)
 }

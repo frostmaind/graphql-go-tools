@@ -13,6 +13,14 @@ type EnumValueDefinitionList struct {
 	RBRACE position.Position // }
 }
 
+func (e EnumValueDefinitionList) Clone() EnumValueDefinitionList {
+	return EnumValueDefinitionList{
+		LBRACE: e.LBRACE,
+		Refs:   cloneRefs(e.Refs),
+		RBRACE: e.RBRACE,
+	}
+}
+
 // EnumValueDefinition
 // example:
 // "NORTH enum value" NORTH @foo
@@ -21,6 +29,15 @@ type EnumValueDefinition struct {
 	EnumValue     ByteSliceReference // e.g. NORTH (Name but not true, false or null
 	HasDirectives bool
 	Directives    DirectiveList // optional, e.g. @foo
+}
+
+func (e EnumValueDefinition) Clone() EnumValueDefinition {
+	return EnumValueDefinition{
+		Description:   e.Description,
+		EnumValue:     e.EnumValue,
+		HasDirectives: e.HasDirectives,
+		Directives:    e.Directives.Clone(),
+	}
 }
 
 func (d *Document) EnumValueDefinitionNameBytes(ref int) ByteSlice {

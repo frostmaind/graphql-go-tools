@@ -25,6 +25,15 @@ type Directive struct {
 	Arguments    ArgumentList // e.g. (if: true)
 }
 
+func (d Directive) Clone() Directive {
+	return Directive{
+		At:           d.At,
+		Name:         d.Name,
+		HasArguments: d.HasArguments,
+		Arguments: d.Arguments.Clone(),
+	}
+}
+
 func (d *Document) PrintDirective(ref int, w io.Writer) error {
 	_, err := w.Write(literal.AT)
 	if err != nil {

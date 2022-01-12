@@ -9,6 +9,15 @@ type SchemaDefinition struct {
 	RootOperationTypeDefinitions RootOperationTypeDefinitionList // e.g. query: Query, mutation: Mutation, subscription: Subscription
 }
 
+func (s SchemaDefinition) Clone() SchemaDefinition {
+	return SchemaDefinition{
+		SchemaLiteral:                s.SchemaLiteral,
+		HasDirectives:                s.HasDirectives,
+		Directives:                   s.Directives.Clone(),
+		RootOperationTypeDefinitions: s.RootOperationTypeDefinitions.Clone(),
+	}
+}
+
 func (s *SchemaDefinition) AddRootOperationTypeDefinitionRefs(refs ...int) {
 	s.RootOperationTypeDefinitions.Refs = append(s.RootOperationTypeDefinitions.Refs, refs...)
 }

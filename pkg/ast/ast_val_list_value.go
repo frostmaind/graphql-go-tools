@@ -8,6 +8,14 @@ type ListValue struct {
 	RBRACK position.Position // ]
 }
 
+func (l ListValue) Clone() ListValue {
+	return ListValue{
+		LBRACK: l.LBRACK,
+		Refs:   cloneRefs(l.Refs),
+		RBRACK: l.RBRACK,
+	}
+}
+
 func (d *Document) ListValuesAreEqual(left, right int) bool {
 	leftValues, rightValues := d.ListValues[left].Refs, d.ListValues[right].Refs
 	if len(leftValues) != len(rightValues) {
