@@ -10,6 +10,8 @@ type RootOperationTypeDefinitionList struct {
 	RBrace position.Position // }
 }
 
+func (r RootOperationTypeDefinitionList) Clone()
+
 type RootOperationTypeDefinition struct {
 	OperationType OperationType     // one of query, mutation, subscription
 	Colon         position.Position // :

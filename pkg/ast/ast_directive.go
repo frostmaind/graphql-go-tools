@@ -12,6 +12,12 @@ type DirectiveList struct {
 	Refs []int
 }
 
+func (d DirectiveList) Clone() DirectiveList {
+	refs := make([]int, len(d.Refs))
+	copy(refs, d.Refs)
+	return DirectiveList{Refs: refs}
+}
+
 type Directive struct {
 	At           position.Position  // @
 	Name         ByteSliceReference // e.g. include
