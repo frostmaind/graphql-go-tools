@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -812,7 +813,10 @@ func setupEngineV2(t *testing.T, ctx context.Context, chatServerURL string) (*Ex
 	engine, err := graphql.NewExecutionEngineV2(ctx, abstractlogger.NoopLogger, engineConf)
 	require.NoError(t, err)
 
-	executorPool := NewExecutorV2Pool(engine, hookHolder.reqCtx)
+	documentCache, err := lru.New(1024)
+	require.NoError(t, err)
+
+	executorPool := NewExecutorV2Pool(engine, hookHolder.reqCtx, WithDocumentCache(documentCache))
 
 	return executorPool, hookHolder
 }
