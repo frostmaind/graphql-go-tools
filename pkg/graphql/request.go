@@ -34,7 +34,7 @@ var (
 	ErrNilSchema    = errors.New("the provided schema is nil")
 )
 
-type Cache interface {
+type NormalizedASTCache interface {
 	Get(key interface{}) (value interface{}, ok bool)
 	Add(key, value interface{}) (evicted bool)
 }
@@ -51,7 +51,7 @@ type Request struct {
 
 	validForSchema map[uint64]ValidationResult
 
-	normalizedASTCache Cache
+	NormalizedASTCache NormalizedASTCache
 	hash               uint64
 }
 
@@ -112,12 +112,12 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 		return report
 	}
 
-	if r.normalizedASTCache != nil {
+	if r.NormalizedASTCache != nil {
 		document := r.getCachedNormalizedDocument()
 		if document != nil {
 			r.document = *document
 			r.isParsed = true
-			r.isNormalized = true // Cache returns normalized ast document.
+			r.isNormalized = true // NormalizedASTCache returns normalized ast document.
 		}
 	}
 
@@ -132,7 +132,7 @@ func (r *Request) getCachedNormalizedDocument() *ast.Document {
 		return nil
 	}
 
-	if cached, ok := r.normalizedASTCache.Get(cacheKey); ok {
+	if cached, ok := r.NormalizedASTCache.Get(cacheKey); ok {
 		if doc, ok := cached.(*ast.Document); ok {
 			return doc
 		}
@@ -147,7 +147,7 @@ func (r *Request) cacheNormalizedDocument() {
 		return
 	}
 
-	r.normalizedASTCache.Add(cacheKey, &r.document)
+	r.NormalizedASTCache.Add(cacheKey, &r.document)
 }
 
 func (r *Request) Hash() (uint64, error) {

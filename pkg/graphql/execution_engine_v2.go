@@ -106,6 +106,7 @@ func (e *EngineResultWriter) AsHTTPResponse(status int, headers http.Header) *ht
 type internalExecutionContext struct {
 	resolveContext *resolve.Context
 	postProcessor  *postprocess.Processor
+
 }
 
 func newInternalExecutionContext() *internalExecutionContext {
