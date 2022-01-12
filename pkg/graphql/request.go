@@ -116,7 +116,7 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 
 	r.isParsed = true
 
-	if cached, ok := r.documentCache.Get(cacheKey); ok {
+	if cached, ok := r.DocumentCache.Get(cacheKey); ok {
 		if doc, ok := cached.(*ast.Document); ok {
 			r.document = *doc.Clone()
 			return report
@@ -125,7 +125,7 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 
 	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
 	if !report.HasErrors() {
-		r.documentCache.Add(cacheKey, r.document)
+		r.DocumentCache.Add(cacheKey, r.document)
 	}
 
 	return report
