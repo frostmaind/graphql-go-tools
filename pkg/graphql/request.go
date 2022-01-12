@@ -12,6 +12,7 @@ import (
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
 	"github.com/jensneuse/graphql-go-tools/pkg/middleware/operation_complexity"
 	"github.com/jensneuse/graphql-go-tools/pkg/operationreport"
+	"github.com/jensneuse/graphql-go-tools/pkg/pool"
 )
 
 const (
@@ -33,6 +34,11 @@ var (
 	ErrNilSchema    = errors.New("the provided schema is nil")
 )
 
+type Cache interface {
+	Get(key interface{}) (value interface{}, ok bool)
+	Add(key, value interface{}) (evicted bool)
+}
+
 type Request struct {
 	OperationName string          `json:"operationName"`
 	Variables     json.RawMessage `json:"variables"`
@@ -44,6 +50,9 @@ type Request struct {
 	request      resolve.Request
 
 	validForSchema map[uint64]ValidationResult
+
+	normalizedASTCache Cache
+	hash               uint64
 }
 
 func UnmarshalRequest(reader io.Reader, request *Request) error {
@@ -103,9 +112,70 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 		return report
 	}
 
+	if r.normalizedASTCache != nil {
+		document := r.getCachedNormalizedDocument()
+		if document != nil {
+			r.document = *document
+			r.isParsed = true
+			r.isNormalized = true // Cache returns normalized ast document.
+		}
+	}
+
 	r.isParsed = true
 	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
 	return report
+}
+
+func (r *Request) getCachedNormalizedDocument() *ast.Document {
+	cacheKey, err := r.Hash()
+	if err != nil {
+		return nil
+	}
+
+	if cached, ok := r.normalizedASTCache.Get(cacheKey); ok {
+		if doc, ok := cached.(*ast.Document); ok {
+			return doc
+		}
+	}
+
+	return nil
+}
+
+func (r *Request) cacheNormalizedDocument() {
+	cacheKey, err := r.Hash()
+	if err != nil {
+		return
+	}
+
+	r.normalizedASTCache.Add(cacheKey, &r.document)
+}
+
+func (r *Request) Hash() (uint64, error) {
+	if r.hash != 0 {
+		return r.hash, nil
+	}
+
+	hash := pool.Hash64.Get()
+	hash.Reset()
+	defer pool.Hash64.Put(hash)
+
+	var err error
+
+	if _, err = hash.Write([]byte(r.OperationName)); err != nil {
+		return 0, err
+	}
+
+	if _, err = hash.Write([]byte(r.Query)); err != nil {
+		return 0, err
+	}
+
+	if _, err = hash.Write(r.Variables); err != nil {
+		return 0, err
+	}
+
+	r.hash = hash.Sum64()
+
+	return r.hash, nil
 }
 
 func (r *Request) IsIntrospectionQuery() (result bool, err error) {

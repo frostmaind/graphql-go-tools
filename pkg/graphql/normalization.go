@@ -43,6 +43,10 @@ func (r *Request) Normalize(schema *Schema) (result NormalizationResult, err err
 		return normalizationResultFromReport(report)
 	}
 
+	if r.normalizedASTCache != nil {
+		r.cacheNormalizedDocument()
+	}
+
 	r.isNormalized = true
 	r.Variables = r.document.Input.Variables
 	if err := normalizeDuplicatedFieldRefs(&r.document); err != nil {
