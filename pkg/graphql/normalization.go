@@ -53,6 +53,11 @@ func (r *Request) Normalize(schema *Schema) (result NormalizationResult, err err
 }
 
 func normalizeDuplicatedFieldRefs(operation *ast.Document) error {
+	if len(operation.Index.ReplacedFragmentSpreads) == 0 {
+		// Fragments have not been spread, there is no reason to deduplicate field refs
+		return nil
+	}
+
 	buf := &bytes.Buffer{}
 
 	if err := astprinter.Print(operation, nil, buf); err != nil {
