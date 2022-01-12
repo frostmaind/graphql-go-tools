@@ -116,15 +116,18 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 
 	r.isParsed = true
 
-	if cached, ok := r.DocumentCache.Get(cacheKey); ok {
-		if doc, ok := cached.(*ast.Document); ok {
-			r.document = *doc.Clone()
-			return report
+	if r.DocumentCache != nil {
+		if cached, ok := r.DocumentCache.Get(cacheKey); ok {
+			if doc, ok := cached.(*ast.Document); ok {
+				r.document = *doc.Clone()
+				return report
+			}
 		}
 	}
 
 	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
-	if !report.HasErrors() {
+
+	if r.DocumentCache != nil && !report.HasErrors() {
 		r.DocumentCache.Add(cacheKey, r.document)
 	}
 
