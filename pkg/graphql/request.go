@@ -128,7 +128,7 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
 
 	if r.DocumentCache != nil && !report.HasErrors() {
-		r.DocumentCache.Add(cacheKey, r.document)
+		r.DocumentCache.Add(cacheKey, &r.document)
 	}
 
 	return report
