@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/buger/jsonparser"
 	"github.com/tidwall/sjson"
@@ -295,16 +294,20 @@ func (p *Planner) EnterField(ref int) {
 
 	p.lastFieldEnclosingTypeName = p.visitor.Walker.EnclosingTypeDefinition.NameString(p.visitor.Definition)
 
-	p.handleFederation()
-	p.addField(ref)
-
-	upstreamFieldRef := p.nodes[len(p.nodes)-1].Ref
 	typeName := p.lastFieldEnclosingTypeName
 
 	fieldConfiguration := p.visitor.Config.Fields.ForTypeField(typeName, fieldName)
 	if fieldConfiguration == nil {
+		p.addField(ref)
 		return
 	}
+
+
+	p.handleFederation(fieldConfiguration)
+	p.addField(ref)
+
+	upstreamFieldRef := p.nodes[len(p.nodes)-1].Ref
+
 	for i := range fieldConfiguration.Arguments {
 		argumentConfiguration := fieldConfiguration.Arguments[i]
 		p.configureArgument(upstreamFieldRef, ref, *fieldConfiguration, argumentConfiguration)
@@ -346,7 +349,7 @@ func (p *Planner) LeaveDocument(operation, definition *ast.Document) {
 
 }
 
-func (p *Planner) handleFederation() {
+func (p *Planner) handleFederation(fieldConfig *plan.FieldConfiguration) {
 	if !p.config.Federation.Enabled || // federation must be enabled
 		p.hasFederationRoot || // should not already have federation root field
 		!p.isNestedRequest() { // must be nested, otherwise it's a regular query
@@ -357,10 +360,10 @@ func (p *Planner) handleFederation() {
 	p.addRepresentationsVariableDefinition() // $representations: [_Any!]!
 	p.addEntitiesSelectionSet()              // {_entities(representations: $representations)
 	p.addOneTypeInlineFragment()             // ... on Product
-	p.addRepresentationsVariable()           // "variables\":{\"representations\":[{\"upc\":\"$$0$$\",\"__typename\":\"Product\"}]}}
+	p.addRepresentationsVariable(fieldConfig)           // "variables\":{\"representations\":[{\"upc\":\"$$0$$\",\"__typename\":\"Product\"}]}}
 }
 
-func (p *Planner) addRepresentationsVariable() {
+func (p *Planner) addRepresentationsVariable(fieldConfig *plan.FieldConfiguration) {
 	// "variables\":{\"representations\":[{\"upc\":\"$$0$$\",\"__typename\":\"Product\"}]}}
 	parser := astparser.NewParser()
 	doc := ast.NewDocument()
@@ -372,48 +375,9 @@ func (p *Planner) addRepresentationsVariable() {
 		return
 	}
 
-	var directiveRefs []int
-
-	for i := range doc.ObjectTypeExtensions {
-		if p.lastFieldEnclosingTypeName == doc.ObjectTypeExtensionNameString(i) {
-			for _, j := range doc.ObjectTypeExtensions[i].Directives.Refs {
-				if doc.DirectiveNameString(j) == "key" {
-					directiveRefs = append(directiveRefs, j)
-				}
-			}
-			break
-		}
-	}
-	for i := range doc.ObjectTypeDefinitions {
-		if p.lastFieldEnclosingTypeName == doc.ObjectTypeDefinitionNameString(i) {
-			for _, j := range doc.ObjectTypeDefinitions[i].Directives.Refs {
-				if doc.DirectiveNameString(j) == "key" {
-					directiveRefs = append(directiveRefs, j)
-				}
-			}
-			break
-		}
-	}
-
-	if len(directiveRefs) == 0 {
-		return
-	}
-
-	var fields []string
-
-	for _, directiveRef := range directiveRefs {
-		value, exists := doc.DirectiveArgumentValueByName(directiveRef, []byte("fields"))
-		if !exists {
-			continue
-		}
-		if value.Kind != ast.ValueKindString {
-			continue
-		}
-
-		fieldsStr := doc.StringValueContentString(value.Ref)
-		fields = append(fields, strings.Split(fieldsStr, " ")...)
-	}
-
+	// RequiresFields includes `@requires` fields as well as federation keys
+	// for the type containing the field currently being visited.
+	fields := fieldConfig.RequiresFields
 	if len(fields) == 0 {
 		return
 	}
