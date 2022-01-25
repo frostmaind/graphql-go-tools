@@ -28,6 +28,8 @@ type Planner struct {
 	config                     Configuration
 	upstreamOperation          *ast.Document
 	upstreamVariables          []byte
+	representationsJson        []byte
+	representationType         string
 	nodes                      []ast.Node
 	variables                  resolve.Variables
 	lastFieldEnclosingTypeName string
@@ -302,7 +304,6 @@ func (p *Planner) EnterField(ref int) {
 		return
 	}
 
-
 	p.handleFederation(fieldConfiguration)
 	p.addField(ref)
 
@@ -332,6 +333,8 @@ func (p *Planner) EnterDocument(operation, definition *ast.Document) {
 	p.nodes = p.nodes[:0]
 	p.upstreamVariables = nil
 	p.variables = p.variables[:0]
+	p.representationsJson = p.representationsJson[:0]
+	p.representationType = ""
 	p.disallowSingleFlight = false
 	p.hasFederationRoot = false
 	p.extractEntities = false
@@ -350,17 +353,38 @@ func (p *Planner) LeaveDocument(operation, definition *ast.Document) {
 }
 
 func (p *Planner) handleFederation(fieldConfig *plan.FieldConfiguration) {
-	if !p.config.Federation.Enabled || // federation must be enabled
-		p.hasFederationRoot || // should not already have federation root field
-		!p.isNestedRequest() { // must be nested, otherwise it's a regular query
+	if !p.config.Federation.Enabled { // federation must be enabled
 		return
 	}
+	// If there's no federation root and this isn't a nested request, this
+	// isn't a federated field and there's nothing to do.
+	if !p.hasFederationRoot && !p.isNestedRequest() {
+		return
+	}
+	// If a federated root is already present, the representations variable has
+	// already been added. Update it to include information for the additional
+	// field. NOTE: only the first federated field has isNestedRequest set to
+	// true. Subsequent fields use hasFederationRoot to determine federation
+	// status.
+	if p.hasFederationRoot {
+		// Ideally the "representations" variable could be set once in
+		// LeaveDocument, but ConfigureFetch is called before this visitor's
+		// LeaveDocument is called. (Updating the visitor logic to call
+		// LeaveDocument in reverse registration order would fix this issue.)
+		p.addRepresentationsVariable(fieldConfig)
+		return
+	}
+	//if !p.config.Federation.Enabled || // federation must be enabled
+	//	p.hasFederationRoot || // should not already have federation root field
+	//	!p.isNestedRequest() { // must be nested, otherwise it's a regular query
+	//	return
+	//}
 	p.hasFederationRoot = true
 	// query($representations: [_Any!]!){_entities(representations: $representations){... on Product
-	p.addRepresentationsVariableDefinition() // $representations: [_Any!]!
-	p.addEntitiesSelectionSet()              // {_entities(representations: $representations)
-	p.addOneTypeInlineFragment()             // ... on Product
-	p.addRepresentationsVariable(fieldConfig)           // "variables\":{\"representations\":[{\"upc\":\"$$0$$\",\"__typename\":\"Product\"}]}}
+	p.addRepresentationsVariableDefinition()  // $representations: [_Any!]!
+	p.addEntitiesSelectionSet()               // {_entities(representations: $representations)
+	p.addOneTypeInlineFragment()              // ... on Product
+	p.addRepresentationsVariable(fieldConfig) // "variables\":{\"representations\":[{\"upc\":\"$$0$$\",\"__typename\":\"Product\"}]}}
 }
 
 func (p *Planner) addRepresentationsVariable(fieldConfig *plan.FieldConfiguration) {
@@ -382,7 +406,14 @@ func (p *Planner) addRepresentationsVariable(fieldConfig *plan.FieldConfiguratio
 		return
 	}
 
-	representationsJson, _ := sjson.SetRawBytes(nil, "__typename", []byte("\""+p.lastFieldEnclosingTypeName+"\""))
+	if p.representationType != "" && (p.lastFieldEnclosingTypeName != p.representationType) {
+		return
+	}
+
+	if len(p.representationsJson) == 0 {
+		p.representationType = p.lastFieldEnclosingTypeName
+		p.representationsJson, _ = sjson.SetRawBytes(nil, "__typename", []byte("\""+p.lastFieldEnclosingTypeName+"\""))
+	}
 	for i := range fields {
 		objectVariable := &resolve.ObjectVariable{
 			Path:                 []string{fields[i]},
@@ -397,9 +428,9 @@ func (p *Planner) addRepresentationsVariable(fieldConfig *plan.FieldConfiguratio
 		if exists {
 			continue
 		}
-		representationsJson, _ = sjson.SetRawBytes(representationsJson, fields[i], []byte(variable))
+		p.representationsJson, _ = sjson.SetRawBytes(p.representationsJson, fields[i], []byte(variable))
 	}
-	representationsJson = append([]byte("["), append(representationsJson, []byte("]")...)...)
+	representationsJson := append([]byte("["), append(p.representationsJson, []byte("]")...)...)
 	p.upstreamVariables, _ = sjson.SetRawBytes(p.upstreamVariables, "representations", representationsJson)
 	p.extractEntities = true
 }
