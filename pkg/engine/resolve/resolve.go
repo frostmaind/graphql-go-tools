@@ -196,7 +196,7 @@ func (c *Context) Clone() Context {
 		afterFetchHook:    c.afterFetchHook,
 		position:          c.position,
 		OperationDocument: c.OperationDocument,
-		OperationName: c.OperationName,
+		OperationName:     c.OperationName,
 	}
 }
 
@@ -250,6 +250,7 @@ func (c *Context) removeResponseArrayLastElements(elements []string) {
 }
 
 func (c *Context) resetResponsePathElements() {
+	fmt.Println("RESET response elements")
 	c.responseElements = nil
 }
 
@@ -1006,18 +1007,6 @@ func (r *Resolver) addResolveError(ctx *Context, objectBuf *BufPair) {
 
 func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, objectBuf *BufPair) (err error) {
 	if len(object.Path) != 0 {
-		data, _, _, _ = jsonparser.Get(data, object.Path...)
-
-		if len(data) == 0 || bytes.Equal(data, literal.NULL) {
-			if object.Nullable {
-				r.resolveNull(objectBuf.Data)
-				return
-			}
-
-			r.addResolveError(ctx, objectBuf)
-			return errNonNullableFieldValueIsNull
-		}
-
 		ctx.addResponseElements(object.Path)
 		defer ctx.removeResponseLastElements(object.Path)
 	}
@@ -1032,6 +1021,20 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 		}
 		for i := range set.buffers {
 			r.MergeBufPairErrors(set.buffers[i], objectBuf)
+		}
+	}
+
+	if len(object.Path) != 0 {
+		data, _, _, _ = jsonparser.Get(data, object.Path...)
+
+		if len(data) == 0 || bytes.Equal(data, literal.NULL) {
+			if object.Nullable {
+				r.resolveNull(objectBuf.Data)
+				return
+			}
+
+			r.addResolveError(ctx, objectBuf)
+			return errNonNullableFieldValueIsNull
 		}
 	}
 
@@ -1061,6 +1064,7 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 			typeName, _, _, _ := jsonparser.Get(fieldData, "__typename")
 			if !bytes.Equal(typeName, object.Fields[i].OnTypeName) {
 				typeNameSkip = true
+				ctx.responseElements = responseElements
 				continue
 			}
 		}
