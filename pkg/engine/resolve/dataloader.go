@@ -364,7 +364,6 @@ func (d *dataLoader) selectedDataForFetch(input [][]byte, path ...string) ([][]b
 	temp := make([][]byte, 0, len(input))
 
 	for i := range input {
-		el, _, _, err := jsonparser.Get(input[i], current)
 		el, dataType, _, err := jsonparser.Get(input[i], current)
 		if dataType == jsonparser.NotExist {
 			// The input has an object that doesn't contain the path component.
