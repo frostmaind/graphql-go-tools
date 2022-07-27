@@ -126,6 +126,20 @@ func TestKnownTypeNames(t *testing.T) {
 			)
 		})
 
+		t.Run("union contains extended types", func(t *testing.T) {
+			runDefinitionValidation(t, `
+					extend type Bar
+					type Baz
+
+					union Foo = Bar | Baz
+
+					type Query {
+						foo: Foo
+					}
+				`, Valid, KnownTypeNames(),
+			)
+		})
+
 		t.Run("unknown type references: input", func(t *testing.T) {
 			runDefinitionValidation(t, `
 					input Foo {
