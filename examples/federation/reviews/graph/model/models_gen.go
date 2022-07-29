@@ -8,6 +8,10 @@ import (
 	"strconv"
 )
 
+type UserOrProduct interface {
+	IsUserOrProduct()
+}
+
 type Role string
 
 const (

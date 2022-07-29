@@ -8,17 +8,22 @@ enum Role {
 
 type Review {
     body: String!
-    author: User! @provides(fields: "username") @hasRole(role: ADMIN)
+    author: User! @hasRole(role: ADMIN)
     product: Product!
 }
 
 extend type User @key(fields: "id") {
     id: ID! @external
-    username: String! @external
     reviews: [Review]
 }
 
 extend type Product @key(fields: "upc") {
     upc: String! @external
     reviews: [Review]
+}
+
+union UserOrProduct = User | Product
+
+extend type Query {
+    userOrProduct: [UserOrProduct]
 }

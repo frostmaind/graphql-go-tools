@@ -6,6 +6,8 @@ type Product struct {
 
 func (Product) IsEntity() {}
 
+func (Product) IsUserOrProduct() {}
+
 type Review struct {
 	Body    string
 	Author  *User
@@ -17,3 +19,5 @@ type User struct {
 }
 
 func (User) IsEntity() {}
+
+func (User) IsUserOrProduct() {}

@@ -246,6 +246,11 @@ func (c *Context) removeResponseLastElements(elements []string) {
 	c.responseElements = c.responseElements[:len(c.responseElements)-len(elements)]
 }
 func (c *Context) removeResponseArrayLastElements(elements []string) {
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//
+	//	}
+	//}()
 	c.responseElements = c.responseElements[:len(c.responseElements)-(len(elements)+1)]
 }
 
@@ -1012,10 +1017,13 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 	}
 
 	var set *resultSet
-	if object.Fetch != nil {
+
+	fetch := r.filterObjectFetch(object, data)
+
+	if fetch != nil {
 		set = r.getResultSet()
 		defer r.freeResultSet(set)
-		err = r.resolveFetch(ctx, object.Fetch, data, set)
+		err = r.resolveFetch(ctx, fetch, data, set)
 		if err != nil {
 			return
 		}
@@ -1041,7 +1049,8 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 	fieldBuf := r.getBufPair()
 	defer r.freeBufPair(fieldBuf)
 
-	responseElements := ctx.responseElements
+	responseElements := make([]string, len(ctx.responseElements))
+	copy(responseElements, ctx.responseElements)
 	lastFetchID := ctx.lastFetchID
 
 	typeNameSkip := false
@@ -1064,6 +1073,9 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 			typeName, _, _, _ := jsonparser.Get(fieldData, "__typename")
 			if !bytes.Equal(typeName, object.Fields[i].OnTypeName) {
 				typeNameSkip = true
+				// Restore the response elements that may have been reset above.
+				ctx.responseElements = responseElements
+				ctx.lastFetchID = lastFetchID
 				continue
 			}
 		}
@@ -1131,6 +1143,60 @@ func (r *Resolver) freeResultSet(set *resultSet) {
 		delete(set.buffers, i)
 	}
 	r.resultSetPool.Put(set)
+}
+
+func (r *Resolver) filterObjectFetch(object *Object, data []byte) Fetch {
+	if object.Fetch == nil {
+		return nil
+	}
+
+	typeName, _, _, _ := jsonparser.Get(data, "__typename")
+	if len(typeName) == 0 {
+		return object.Fetch
+	}
+
+	requiredBufferIDs := make(map[int]struct{})
+
+	for _, field := range object.Fields {
+		if field.OnTypeName != nil && !bytes.Equal(typeName, field.OnTypeName) {
+			continue
+		}
+
+		requiredBufferIDs[field.BufferID] = struct{}{}
+	}
+
+	switch f := object.Fetch.(type) {
+	case *SingleFetch:
+		if _, ok := requiredBufferIDs[f.BufferId]; ok {
+			return f
+		}
+	case *BatchFetch:
+		if _, ok := requiredBufferIDs[f.Fetch.BufferId]; ok {
+			return f
+		}
+	case *ParallelFetch:
+		fetches := make([]Fetch, 0, len(f.Fetches))
+
+		for _, fetch := range f.Fetches {
+			switch pF := fetch.(type) {
+			case *SingleFetch:
+				if _, ok := requiredBufferIDs[pF.BufferId]; ok {
+					fetches = append(fetches, pF)
+				}
+			case *BatchFetch:
+				if _, ok := requiredBufferIDs[pF.Fetch.BufferId]; ok {
+					fetches = append(fetches, pF)
+				}
+
+			}
+		}
+
+		if len(fetches) > 0 {
+			return &ParallelFetch{Fetches: fetches}
+		}
+	}
+
+	return nil
 }
 
 func (r *Resolver) resolveFetch(ctx *Context, fetch Fetch, data []byte, set *resultSet) (err error) {
