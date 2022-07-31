@@ -309,6 +309,7 @@ type objectFetchConfiguration struct {
 	bufferID       int
 	isSubscription bool
 	fieldRef       int
+	typeName       string
 }
 
 func (v *Visitor) AllowVisitor(kind astvisitor.VisitorKind, ref int, visitor interface{}) bool {
@@ -729,7 +730,7 @@ func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *
 		switch parts[0] {
 		case "object":
 			variable := &resolve.ObjectVariable{
-				Path: path,
+				Path:               path,
 				RenderAsPlainValue: true,
 			}
 			variableName, _ = variables.AddVariable(variable)
@@ -850,6 +851,7 @@ func (v *Visitor) configureFetch(internal objectFetchConfiguration, external Fet
 		DisallowSingleFlight:  external.DisallowSingleFlight,
 		DataSourceIdentifier:  []byte(dataSourceType),
 		ProcessResponseConfig: external.ProcessResponseConfig,
+		OnTypeName:            []byte(internal.typeName),
 	}
 
 	if !external.BatchConfig.AllowBatch {
@@ -1157,6 +1159,7 @@ func (c *configurationVisitor) EnterField(ref int) {
 				planner:        planner,
 				isSubscription: isSubscription,
 				fieldRef:       ref,
+				typeName:       typeName,
 			})
 			return
 		}

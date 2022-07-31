@@ -1375,6 +1375,7 @@ type SingleFetch struct {
 	InputTemplate         InputTemplate
 	DataSourceIdentifier  []byte
 	ProcessResponseConfig ProcessResponseConfig
+	OnTypeName            []byte
 }
 
 type ProcessResponseConfig struct {

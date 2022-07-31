@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"bytes"
 	"fmt"
 	"sync"
 
@@ -187,7 +188,7 @@ func (d *dataLoader) Load(ctx *Context, fetch *SingleFetch, responsePair *BufPai
 		return
 	}
 
-	fetchParams, err := d.selectedDataForFetch(parentResult.data(), ctx.responseElements...)
+	fetchParams, err := d.selectedDataForFetch(parentResult.data(), fetch.OnTypeName, ctx.responseElements...)
 	if err != nil {
 		return err
 	}
@@ -222,7 +223,7 @@ func (d *dataLoader) LoadBatch(ctx *Context, batchFetch *BatchFetch, responsePai
 		return fmt.Errorf("has not got fetch for %d", ctx.lastFetchID)
 	}
 
-	fetchParams, err := d.selectedDataForFetch(parentResult.data(), ctx.responseElements...)
+	fetchParams, err := d.selectedDataForFetch(parentResult.data(), batchFetch.Fetch.OnTypeName, ctx.responseElements...)
 	if err != nil {
 		return err
 	}
@@ -340,9 +341,9 @@ func (d *dataLoader) setFetchState(batchState fetchState, fetchID int) {
 	d.fetches[fetchID] = batchState
 }
 
-func (d *dataLoader) selectedDataForFetch(input [][]byte, path ...string) ([][]byte, error) {
+func (d *dataLoader) selectedDataForFetch(input [][]byte, onType []byte, path ...string) ([][]byte, error) {
 	if len(path) == 0 {
-		return input, nil
+		return d.filterDataForFetch(input, onType), nil
 	}
 
 	current, rest := path[0], path[1:]
@@ -357,7 +358,7 @@ func (d *dataLoader) selectedDataForFetch(input [][]byte, path ...string) ([][]b
 				return nil, nil
 			}
 
-			return d.selectedDataForFetch(vals, rest...)
+			return d.selectedDataForFetch(vals, onType, rest...)
 		})
 	}
 
@@ -406,7 +407,23 @@ func (d *dataLoader) selectedDataForFetch(input [][]byte, path ...string) ([][]b
 		temp = append(temp, el)
 	}
 
-	return d.selectedDataForFetch(temp, rest...)
+	return d.selectedDataForFetch(temp, onType, rest...)
+}
+
+func (d *dataLoader) filterDataForFetch(input [][]byte, onType []byte) [][]byte {
+	var idx int
+
+	for _, item := range input {
+		itemType, _, _, _ := jsonparser.Get(item, "__typename")
+		if len(itemType) != 0 && !bytes.Equal(onType, itemType) {
+			continue
+		}
+
+		input[idx] = item
+		idx++
+	}
+
+	return input[:idx]
 }
 
 func (d *dataLoader) getResultBufPair() (pair *BufPair) {
