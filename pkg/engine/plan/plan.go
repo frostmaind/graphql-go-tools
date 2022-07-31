@@ -400,6 +400,7 @@ type objectFetchConfiguration struct {
 	bufferID           int
 	isSubscription     bool
 	fieldRef           int
+	typeName           string
 	fieldDefinitionRef int
 }
 
@@ -1219,6 +1220,7 @@ func (v *Visitor) configureFetch(internal objectFetchConfiguration, external Fet
 		DataSourceIdentifier:  []byte(dataSourceType),
 		ProcessResponseConfig: external.ProcessResponseConfig,
 		DisableDataLoader:     external.DisableDataLoader,
+		OnType:                []byte(internal.typeName),
 	}
 
 	// if a field depends on an exported variable, data loader needs to be disabled
@@ -1544,6 +1546,7 @@ func (c *configurationVisitor) EnterField(ref int) {
 				isSubscription:     isSubscription,
 				fieldRef:           ref,
 				fieldDefinitionRef: fieldDefinition,
+				typeName:           typeName,
 			})
 			return
 		}

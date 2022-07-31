@@ -1017,6 +1017,60 @@ func (r *Resolver) addResolveError(ctx *Context, objectBuf *BufPair) {
 	objectBuf.WriteErr(unableToResolveMsg, locations.Bytes(), pathBytes, nil)
 }
 
+func (r *Resolver) filterObjectFetch(object *Object, data []byte) Fetch {
+	if object.Fetch == nil {
+		return nil
+	}
+
+	typeName, _, _, _ := jsonparser.Get(data, "__typename")
+	if len(typeName) == 0 {
+		return object.Fetch
+	}
+
+	requiredBufferIDs := make(map[int]struct{})
+
+	for _, field := range object.Fields {
+		if field.OnTypeName != nil && !bytes.Equal(typeName, field.OnTypeName) {
+			continue
+		}
+
+		requiredBufferIDs[field.BufferID] = struct{}{}
+	}
+
+	switch f := object.Fetch.(type) {
+	case *SingleFetch:
+		if _, ok := requiredBufferIDs[f.BufferId]; ok {
+			return f
+		}
+	case *BatchFetch:
+		if _, ok := requiredBufferIDs[f.Fetch.BufferId]; ok {
+			return f
+		}
+	case *ParallelFetch:
+		fetches := make([]Fetch, 0, len(f.Fetches))
+
+		for _, fetch := range f.Fetches {
+			switch pF := fetch.(type) {
+			case *SingleFetch:
+				if _, ok := requiredBufferIDs[pF.BufferId]; ok {
+					fetches = append(fetches, pF)
+				}
+			case *BatchFetch:
+				if _, ok := requiredBufferIDs[pF.Fetch.BufferId]; ok {
+					fetches = append(fetches, pF)
+				}
+
+			}
+		}
+
+		if len(fetches) > 0 {
+			return &ParallelFetch{Fetches: fetches}
+		}
+	}
+
+	return nil
+}
+
 func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, objectBuf *BufPair) (err error) {
 	if len(object.Path) != 0 {
 		data, _, _, _ = jsonparser.Get(data, object.Path...)
@@ -1040,10 +1094,13 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 	}
 
 	var set *resultSet
-	if object.Fetch != nil {
+
+	fetch := r.filterObjectFetch(object, data)
+
+	if fetch != nil {
 		set = r.getResultSet()
 		defer r.freeResultSet(set)
-		err = r.resolveFetch(ctx, object.Fetch, data, set)
+		err = r.resolveFetch(ctx, fetch, data, set)
 		if err != nil {
 			return
 		}
@@ -1355,6 +1412,7 @@ type SingleFetch struct {
 	InputTemplate         InputTemplate
 	DataSourceIdentifier  []byte
 	ProcessResponseConfig ProcessResponseConfig
+	OnType                []byte
 }
 
 type ProcessResponseConfig struct {

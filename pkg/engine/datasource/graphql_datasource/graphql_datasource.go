@@ -10,6 +10,7 @@ import (
 
 	"github.com/buger/jsonparser"
 	"github.com/tidwall/sjson"
+
 	"github.com/wundergraph/graphql-go-tools/pkg/asttransform"
 
 	"github.com/wundergraph/graphql-go-tools/pkg/ast"
@@ -599,6 +600,16 @@ func (p *Planner) addOneTypeInlineFragment() {
 		Ref:  inlineFragment,
 	})
 	p.nodes = append(p.nodes, selectionSet)
+
+	// add __typename field to selection set which contains typeCondition
+	// so that the resolver can distinguish between the response types
+	typeNameField := p.upstreamOperation.AddField(ast.Field{
+		Name: p.upstreamOperation.Input.AppendInputBytes([]byte("__typename")),
+	})
+	p.upstreamOperation.AddSelection(p.nodes[len(p.nodes)-1].Ref, ast.Selection{
+		Kind: ast.SelectionKindField,
+		Ref:  typeNameField.Ref,
+	})
 }
 
 func (p *Planner) addEntitiesSelectionSet() {
