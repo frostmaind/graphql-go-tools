@@ -1116,12 +1116,18 @@ func (c *configurationVisitor) EnterField(ref int) {
 	parent := c.walker.Path.DotDelimitedString()
 	current := parent + "." + fieldAliasOrName
 	root := c.walker.Ancestors[0]
+	parentPath := parent
+
+	if onTypeName := c.resolveOnTypeName(); len(onTypeName) != 0 {
+		parentPath += "." + string(onTypeName)
+	}
+
 	if root.Kind != ast.NodeKindOperationDefinition {
 		return
 	}
 	isSubscription := c.isSubscription(root.Ref, current)
 	for i, planner := range c.planners {
-		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
+		if planner.hasParent(parentPath) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
 			// same parent + root node = root sibling
 			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
 			c.fieldBuffers[ref] = planner.bufferID
@@ -1145,7 +1151,7 @@ func (c *configurationVisitor) EnterField(ref int) {
 			planner := c.config.DataSources[i].Factory.Planner(c.ctx)
 			c.planners = append(c.planners, plannerConfiguration{
 				bufferID:   bufferID,
-				parentPath: parent,
+				parentPath: parentPath,
 				planner:    planner,
 				paths: []pathConfiguration{
 					{
@@ -1214,6 +1220,18 @@ type requiredFieldsVisitor struct {
 	config                *Configuration
 	operationName         string
 	skipFieldPaths        []string
+}
+
+func (c *configurationVisitor) resolveOnTypeName() []byte {
+	if len(c.walker.Ancestors) < 2 {
+		return nil
+	}
+	inlineFragment := c.walker.Ancestors[len(c.walker.Ancestors)-2]
+	if inlineFragment.Kind != ast.NodeKindInlineFragment {
+		return nil
+	}
+
+	return c.operation.InlineFragmentTypeConditionName(inlineFragment.Ref)
 }
 
 func (r *requiredFieldsVisitor) EnterDocument(operation, definition *ast.Document) {
