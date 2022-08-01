@@ -583,19 +583,19 @@ func TestResolver_ResolveNode(t *testing.T) {
 							Path: []string{"pet"},
 							Fields: []*Field{
 								{
-									BufferID:   0,
-									HasBuffer:  false,
-									Name:       []byte("id"),
+									BufferID:  0,
+									HasBuffer: false,
+									Name:      []byte("id"),
 									Value: &String{
 										Path: []string{"id"},
 									},
 								},
 								{
-									BufferID:   0,
-									HasBuffer:  false,
-									Name:       []byte("detail"),
+									BufferID:  0,
+									HasBuffer: false,
+									Name:      []byte("detail"),
 									Value: &Object{
-										Path: []string{"detail"},
+										Path:     []string{"detail"},
 										Nullable: true,
 										Fields: []*Field{
 											{
@@ -1204,7 +1204,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 						BufferID:  0,
 						Name:      []byte("notNullableArray"),
 						Value: &Array{
-							Path: []string{"some_path"},
+							Path:     []string{"some_path"},
 							Nullable: false,
 							Item: &Object{
 								Nullable: false,
@@ -1828,6 +1828,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 					ProcessResponseConfig: ProcessResponseConfig{
 						ExtractGraphqlResponse: true,
 					},
+					OnTypeName: []byte("Query"),
 				},
 				Fields: []*Field{
 					{
@@ -1848,7 +1849,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 												SegmentType:        VariableSegmentType,
 												VariableSource:     VariableSourceObject,
 												VariableSourcePath: []string{"id"},
-												VariableValueType: jsonparser.String,
+												VariableValueType:  jsonparser.String,
 											},
 											{
 												Data:        []byte(`,"__typename":"User"}]}}}`),
@@ -1860,6 +1861,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 									ProcessResponseConfig: ProcessResponseConfig{
 										ExtractGraphqlResponse: true,
 									},
+									OnTypeName: []byte("User"),
 								},
 								BatchFactory: reviewBatchFactory,
 							},
@@ -1913,7 +1915,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 																			SegmentType:        VariableSegmentType,
 																			VariableSource:     VariableSourceObject,
 																			VariableSourcePath: []string{"upc"},
-																			VariableValueType: jsonparser.String,
+																			VariableValueType:  jsonparser.String,
 																		},
 																		{
 																			Data:        []byte(`,"__typename":"Product"}]}}}`),
@@ -1924,6 +1926,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 																ProcessResponseConfig: ProcessResponseConfig{
 																	ExtractGraphqlResponse: true,
 																},
+																OnTypeName: []byte("Product"),
 															},
 															BatchFactory: productBatchFactory,
 														},
@@ -2026,6 +2029,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 					ProcessResponseConfig: ProcessResponseConfig{
 						ExtractGraphqlResponse: true,
 					},
+					OnTypeName: []byte("Query"),
 				},
 				Fields: []*Field{
 					{
@@ -2046,7 +2050,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 												SegmentType:        VariableSegmentType,
 												VariableSource:     VariableSourceObject,
 												VariableSourcePath: []string{"id"},
-												VariableValueType: jsonparser.String,
+												VariableValueType:  jsonparser.String,
 											},
 											{
 												Data:        []byte(`,"__typename":"User"}]}}}`),
@@ -2055,6 +2059,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 										},
 									},
 									DataSource: reviewsService,
+									OnTypeName: []byte("User"),
 								},
 								BatchFactory: reviewBatchFactory,
 							},
@@ -2108,7 +2113,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 																			SegmentType:        VariableSegmentType,
 																			VariableSource:     VariableSourceObject,
 																			VariableSourcePath: []string{"upc"},
-																			VariableValueType: jsonparser.String,
+																			VariableValueType:  jsonparser.String,
 																		},
 																		{
 																			Data:        []byte(`,"__typename":"Product"}]}}}`),
@@ -2119,6 +2124,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 																ProcessResponseConfig: ProcessResponseConfig{
 																	ExtractGraphqlResponse: true,
 																},
+																OnTypeName: []byte("Product"),
 															},
 															BatchFactory: productBatchFactory,
 														},

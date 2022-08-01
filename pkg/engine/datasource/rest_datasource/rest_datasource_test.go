@@ -122,6 +122,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						Input:                `{"method":"GET","url":"https://example.com/friend"}`,
 						DataSource:           &Source{},
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -140,11 +141,12 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 									DataSource: &Source{},
 									Variables: resolve.NewVariables(
 										&resolve.ObjectVariable{
-											Path: []string{"name"},
+											Path:               []string{"name"},
 											RenderAsPlainValue: true,
 										},
 									),
 									DataSourceIdentifier: []byte("rest_datasource.Source"),
+									OnTypeName:           []byte("Friend"),
 								},
 								Fields: []*resolve.Field{
 									{
@@ -258,17 +260,18 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"idVariable"},
-								JsonValueType: jsonparser.String,
+								Path:               []string{"idVariable"},
+								JsonValueType:      jsonparser.String,
 								RenderAsPlainValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"a"},
-								JsonValueType: jsonparser.String,
+								Path:               []string{"a"},
+								JsonValueType:      jsonparser.String,
 								RenderAsPlainValue: true,
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -339,17 +342,18 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 								DataSource: &Source{},
 								Variables: resolve.NewVariables(
 									&resolve.ContextVariable{
-										Path:          []string{"idVariable"},
-										JsonValueType: jsonparser.String,
+										Path:               []string{"idVariable"},
+										JsonValueType:      jsonparser.String,
 										RenderAsPlainValue: true,
 									},
 									&resolve.ContextVariable{
-										Path:          []string{"a"},
-										JsonValueType: jsonparser.String,
+										Path:               []string{"a"},
+										JsonValueType:      jsonparser.String,
 										RenderAsPlainValue: true,
 									},
 								),
 								DataSourceIdentifier: []byte("rest_datasource.Source"),
+								OnTypeName:           []byte("Query"),
 							},
 							&resolve.SingleFetch{
 								BufferId:   3,
@@ -357,17 +361,18 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 								DataSource: &Source{},
 								Variables: resolve.NewVariables(
 									&resolve.ContextVariable{
-										Path:          []string{"idVariable"},
-										JsonValueType: jsonparser.String,
+										Path:               []string{"idVariable"},
+										JsonValueType:      jsonparser.String,
 										RenderAsPlainValue: true,
 									},
 									&resolve.ContextVariable{
-										Path:          []string{"d"},
-										JsonValueType: jsonparser.String,
+										Path:               []string{"d"},
+										JsonValueType:      jsonparser.String,
 										RenderAsPlainValue: true,
 									},
 								),
 								DataSourceIdentifier: []byte("rest_datasource.Source"),
+								OnTypeName:           []byte("Query"),
 							},
 						},
 					},
@@ -390,12 +395,13 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 											DataSource: &Source{},
 											Variables: resolve.NewVariables(
 												&resolve.ContextVariable{
-													Path:          []string{"b"},
-													JsonValueType: jsonparser.String,
+													Path:               []string{"b"},
+													JsonValueType:      jsonparser.String,
 													RenderAsPlainValue: true,
 												},
 											),
 											DataSourceIdentifier: []byte("rest_datasource.Source"),
+											OnTypeName:           []byte("Friend"),
 										},
 										&resolve.SingleFetch{
 											BufferId:   2,
@@ -403,12 +409,13 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 											DataSource: &Source{},
 											Variables: resolve.NewVariables(
 												&resolve.ContextVariable{
-													Path:          []string{"c"},
-													JsonValueType: jsonparser.String,
+													Path:               []string{"c"},
+													JsonValueType:      jsonparser.String,
 													RenderAsPlainValue: true,
 												},
 											),
 											DataSourceIdentifier: []byte("rest_datasource.Source"),
+											OnTypeName:           []byte("Friend"),
 										},
 									},
 								},
@@ -537,17 +544,18 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"a"},
-								JsonValueType: jsonparser.String,
+								Path:               []string{"a"},
+								JsonValueType:      jsonparser.String,
 								RenderAsPlainValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"b"},
-								JsonValueType: jsonparser.String,
+								Path:               []string{"b"},
+								JsonValueType:      jsonparser.String,
 								RenderAsPlainValue: true,
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -684,6 +692,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						DataSource:           &Source{},
 						DisallowSingleFlight: true,
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -757,6 +766,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 							},
 						},
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -831,17 +841,18 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"a"},
-								JsonValueType: jsonparser.String,
+								Path:               []string{"a"},
+								JsonValueType:      jsonparser.String,
 								RenderAsPlainValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"idVariable"},
-								JsonValueType: jsonparser.String,
+								Path:               []string{"idVariable"},
+								JsonValueType:      jsonparser.String,
 								RenderAsPlainValue: true,
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -939,6 +950,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -1020,6 +1032,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jensneuse/graphql-go-tools/examples/chat"
+
 	. "github.com/jensneuse/graphql-go-tools/pkg/engine/datasourcetesting"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/plan"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/resolve"
@@ -47,8 +48,8 @@ func TestGraphQLDataSource(t *testing.T) {
 					Input:      `{"method":"POST","url":"https://swapi.com/graphql","header":{"Authorization":["$$1$$"],"Invalid-Template":["{{ request.headers.Authorization }}"]},"body":{"query":"query($id: ID!){droid(id: $id){name aliased: name friends {name} primaryFunction} hero {name} stringList nestedStringList}","variables":{"id":$$0$$}}}`,
 					Variables: resolve.NewVariables(
 						&resolve.ContextVariable{
-							Path:          []string{"id"},
-							JsonValueType: jsonparser.String,
+							Path:                 []string{"id"},
+							JsonValueType:        jsonparser.String,
 							RenderAsGraphQLValue: true,
 						},
 						&resolve.HeaderVariable{
@@ -57,6 +58,7 @@ func TestGraphQLDataSource(t *testing.T) {
 					),
 					DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 					ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+					OnTypeName:            []byte("Query"),
 				},
 				Fields: []*resolve.Field{
 					{
@@ -268,14 +270,15 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"name"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"name"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 						),
 						DisallowSingleFlight:  true,
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Mutation"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -379,19 +382,20 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"a"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"a"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"b"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"b"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 						),
 						DisallowSingleFlight:  false,
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -494,19 +498,20 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"a"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"a"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"b"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"b"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 						),
 						DisallowSingleFlight:  false,
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -637,19 +642,20 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"a"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"a"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"b"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"b"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 						),
 						DisallowSingleFlight:  false,
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -816,18 +822,19 @@ func TestGraphQLDataSource(t *testing.T) {
 								DataSource: &Source{},
 								Variables: resolve.NewVariables(
 									&resolve.ContextVariable{
-										Path:          []string{"firstArg"},
-										JsonValueType: jsonparser.String,
+										Path:                 []string{"firstArg"},
+										JsonValueType:        jsonparser.String,
 										RenderAsGraphQLValue: true,
 									},
 									&resolve.ContextVariable{
-										Path:          []string{"thirdArg"},
-										JsonValueType: jsonparser.Number,
+										Path:                 []string{"thirdArg"},
+										JsonValueType:        jsonparser.Number,
 										RenderAsGraphQLValue: true,
 									},
 								),
 								DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 								ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+								OnTypeName:            []byte("Query"),
 							},
 							&resolve.SingleFetch{
 								BufferId:   2,
@@ -835,18 +842,19 @@ func TestGraphQLDataSource(t *testing.T) {
 								DataSource: &Source{},
 								Variables: resolve.NewVariables(
 									&resolve.ContextVariable{
-										Path:          []string{"secondArg"},
-										JsonValueType: jsonparser.Boolean,
+										Path:                 []string{"secondArg"},
+										JsonValueType:        jsonparser.Boolean,
 										RenderAsGraphQLValue: true,
 									},
 									&resolve.ContextVariable{
-										Path:          []string{"fourthArg"},
-										JsonValueType: jsonparser.Number,
+										Path:                 []string{"fourthArg"},
+										JsonValueType:        jsonparser.Number,
 										RenderAsGraphQLValue: true,
 									},
 								),
 								DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 								ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+								OnTypeName:            []byte("Query"),
 							},
 						},
 					},
@@ -869,6 +877,7 @@ func TestGraphQLDataSource(t *testing.T) {
 									Input:                 `{"method":"POST","url":"https://country.service","body":{"query":"{countries {name}}"}}`,
 									DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 									ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+									OnTypeName:            []byte("ServiceOneResponse"),
 								},
 
 								Fields: []*resolve.Field{
@@ -928,12 +937,13 @@ func TestGraphQLDataSource(t *testing.T) {
 									Input:      `{"method":"POST","url":"https://service.one","body":{"query":"query($a: String){serviceOneResponse: serviceOne(serviceOneArg: $a){fieldOne}}","variables":{"a":$$0$$}}}`,
 									Variables: resolve.NewVariables(
 										&resolve.ObjectVariable{
-											Path: []string{"serviceOneField"},
+											Path:                 []string{"serviceOneField"},
 											RenderAsGraphQLValue: true,
 										},
 									),
 									DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 									ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+									OnTypeName:            []byte("ServiceTwoResponse"),
 								},
 								Fields: []*resolve.Field{
 									{
@@ -1222,24 +1232,25 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"title"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"title"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"completed"},
-								JsonValueType: jsonparser.Boolean,
+								Path:                 []string{"completed"},
+								JsonValueType:        jsonparser.Boolean,
 								RenderAsGraphQLValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"name"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"name"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 						),
 						DisallowSingleFlight:  true,
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Mutation"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -1392,19 +1403,20 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"id"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"id"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"name"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"name"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 						),
 						DisallowSingleFlight:  true,
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Mutation"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -1540,19 +1552,20 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource: &Source{},
 						Variables: resolve.NewVariables(
 							&resolve.ContextVariable{
-								Path:          []string{"name"},
-								JsonValueType: jsonparser.String,
+								Path:                 []string{"name"},
+								JsonValueType:        jsonparser.String,
 								RenderAsGraphQLValue: true,
 							},
 							&resolve.ContextVariable{
-								Path:          []string{"personal"},
-								JsonValueType: jsonparser.Boolean,
+								Path:                 []string{"personal"},
+								JsonValueType:        jsonparser.Boolean,
 								RenderAsGraphQLValue: true,
 							},
 						),
 						DisallowSingleFlight:  true,
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Mutation"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -1774,8 +1787,8 @@ func TestGraphQLDataSource(t *testing.T) {
 				Input: []byte(`{"url":"wss://swapi.com/graphql","body":{"query":"subscription($a: String){foo(bar: $a)}","variables":{"a":$$0$$}}}`),
 				Variables: resolve.NewVariables(
 					&resolve.ContextVariable{
-						Path:          []string{"a"},
-						JsonValueType: jsonparser.String,
+						Path:                 []string{"a"},
+						JsonValueType:        jsonparser.String,
 						RenderAsGraphQLValue: true,
 					},
 				),
@@ -1869,6 +1882,7 @@ func TestGraphQLDataSource(t *testing.T) {
 						DataSource:            &Source{},
 						DataSourceIdentifier:  []byte("graphql_datasource.Source"),
 						ProcessResponseConfig: resolve.ProcessResponseConfig{ExtractGraphqlResponse: true},
+						OnTypeName:            []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -1883,12 +1897,12 @@ func TestGraphQLDataSource(t *testing.T) {
 								Fetch: &resolve.BatchFetch{
 									Fetch: &resolve.SingleFetch{
 										BufferId: 1,
-										Input:    `{"method":"POST","url":"http://review.service","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {reviews {body author {id username} product {upc}}}}}","variables":{"representations":[{"id":$$0$$,"__typename":"User"}]}}}`,
+										Input:    `{"method":"POST","url":"http://review.service","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {__typename reviews {body author {id username} product {upc}}}}}","variables":{"representations":[{"id":$$0$$,"__typename":"User"}]}}}`,
 										Variables: resolve.NewVariables(
 											&resolve.ObjectVariable{
-												Path: []string{"id"},
-								JsonValueType: jsonparser.String,
-								RenderAsGraphQLValue: true,
+												Path:                 []string{"id"},
+												JsonValueType:        jsonparser.String,
+												RenderAsGraphQLValue: true,
 											},
 										),
 										DataSource:           &Source{},
@@ -1896,7 +1910,8 @@ func TestGraphQLDataSource(t *testing.T) {
 										ProcessResponseConfig: resolve.ProcessResponseConfig{
 											ExtractGraphqlResponse:    true,
 											ExtractFederationEntities: true,
-						},
+										},
+										OnTypeName: []byte("User"),
 									},
 									BatchFactory: batchFactory,
 								},
@@ -1992,13 +2007,13 @@ func TestGraphQLDataSource(t *testing.T) {
 																	&resolve.BatchFetch{
 																		Fetch: &resolve.SingleFetch{
 																			BufferId:   2,
-																			Input:      `{"method":"POST","url":"http://product.service","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name price}}}","variables":{"representations":[{"upc":$$0$$,"__typename":"Product"}]}}}`,
+																			Input:      `{"method":"POST","url":"http://product.service","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {__typename name price}}}","variables":{"representations":[{"upc":$$0$$,"__typename":"Product"}]}}}`,
 																			DataSource: &Source{},
 																			Variables: resolve.NewVariables(
 																				&resolve.ObjectVariable{
-																					Path: []string{"upc"},
-																JsonValueType: jsonparser.String,
-																RenderAsGraphQLValue: true,
+																					Path:                 []string{"upc"},
+																					JsonValueType:        jsonparser.String,
+																					RenderAsGraphQLValue: true,
 																				},
 																			),
 																			DataSourceIdentifier: []byte("graphql_datasource.Source"),
@@ -2006,18 +2021,19 @@ func TestGraphQLDataSource(t *testing.T) {
 																				ExtractGraphqlResponse:    true,
 																				ExtractFederationEntities: true,
 																			},
+																			OnTypeName: []byte("Product"),
 																		},
 																		BatchFactory: batchFactory,
 																	},
 																	&resolve.BatchFetch{
 																		Fetch: &resolve.SingleFetch{
 																			BufferId: 3,
-																			Input:    `{"method":"POST","url":"http://review.service","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {reviews {body author {id username}}}}}","variables":{"representations":[{"upc":$$0$$,"__typename":"Product"}]}}}`,
+																			Input:    `{"method":"POST","url":"http://review.service","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {__typename reviews {body author {id username}}}}}","variables":{"representations":[{"upc":$$0$$,"__typename":"Product"}]}}}`,
 																			Variables: resolve.NewVariables(
 																				&resolve.ObjectVariable{
-																					Path: []string{"upc"},
-																	JsonValueType: jsonparser.String,
-																	RenderAsGraphQLValue: true,
+																					Path:                 []string{"upc"},
+																					JsonValueType:        jsonparser.String,
+																					RenderAsGraphQLValue: true,
 																				},
 																			),
 																			DataSource:           &Source{},
@@ -2026,6 +2042,7 @@ func TestGraphQLDataSource(t *testing.T) {
 																				ExtractGraphqlResponse:    true,
 																				ExtractFederationEntities: true,
 																			},
+																			OnTypeName: []byte("Product"),
 																		},
 																		BatchFactory: batchFactory,
 																	},
