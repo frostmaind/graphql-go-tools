@@ -375,6 +375,8 @@ func (h *connectionHandler) handleMessageTypeData(data []byte) {
 	ctx, cancel := context.WithTimeout(h.ctx, time.Second*5)
 	defer cancel()
 
+	fmt.Println("RECEIVE SUBSCRIPTION MSG FROM UPSTREAM", string(payload))
+
 	select {
 	case <-ctx.Done():
 	case sub.next <- payload:
