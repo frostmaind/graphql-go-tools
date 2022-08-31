@@ -468,6 +468,12 @@ func (b *batchFetchState) next(ctx *Context) (*BufPair, error) {
 		return nil, b.fetchError
 	}
 
+	if len(b.results) <= b.nextIdx {
+		buf := NewBufPair()
+		buf.Data.WriteBytes([]byte("null"))
+		return buf, nil
+	}
+
 	res := b.results[b.nextIdx]
 
 	b.nextIdx++
