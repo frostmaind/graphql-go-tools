@@ -502,6 +502,12 @@ func (b *singleFetchState) next(ctx *Context) (*BufPair, error) {
 		return nil, b.fetchErrors[b.nextIdx]
 	}
 
+	if len(b.results) <= b.nextIdx {
+		buf := NewBufPair()
+		buf.Data.WriteBytes([]byte("null"))
+		return buf, nil
+	}
+
 	res := b.results[b.nextIdx]
 
 	b.nextIdx++
