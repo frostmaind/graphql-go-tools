@@ -328,6 +328,9 @@ func (v *Visitor) AllowVisitor(kind astvisitor.VisitorKind, ref int, visitor int
 	for _, config := range v.planners {
 		if config.planner == visitor && config.hasPath(path) {
 			switch kind {
+			case astvisitor.EnterField, astvisitor.LeaveField:
+				typeName := v.Walker.EnclosingTypeDefinition.NameString(v.Definition)
+				return config.hasPathType(path, typeName)
 			case astvisitor.EnterSelectionSet, astvisitor.LeaveSelectionSet:
 				return !config.isExitPath(path)
 			default:
@@ -1034,6 +1037,15 @@ func (p *plannerConfiguration) hasPath(path string) bool {
 	return false
 }
 
+func (p *plannerConfiguration) hasPathType(path string, typeName string) bool {
+	for i := range p.paths {
+		if p.paths[i].path == path && p.paths[i].typeName == typeName {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *plannerConfiguration) isExitPath(path string) bool {
 	for i := range p.paths {
 		if p.paths[i].path == path {
@@ -1098,6 +1110,7 @@ func (p *plannerConfiguration) hasRootNode(typeName, fieldName string) bool {
 
 type pathConfiguration struct {
 	path              string
+	typeName          string
 	exitPlannerOnNode bool
 }
 
@@ -1129,13 +1142,13 @@ func (c *configurationVisitor) EnterField(ref int) {
 	for i, planner := range c.planners {
 		if planner.hasParent(parentPath) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
 			// same parent + root node = root sibling
-			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
+			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current, typeName: typeName})
 			c.fieldBuffers[ref] = planner.bufferID
 			return
 		}
 		if planner.hasPath(parent) && planner.hasChildNode(typeName, fieldName) {
 			// has parent path + has child node = child
-			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
+			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current, typeName: typeName})
 			return
 		}
 	}
@@ -1155,7 +1168,8 @@ func (c *configurationVisitor) EnterField(ref int) {
 				planner:    planner,
 				paths: []pathConfiguration{
 					{
-						path: current,
+						path:     current,
+						typeName: typeName,
 					},
 				},
 				dataSourceConfiguration: config,
