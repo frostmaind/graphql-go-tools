@@ -20,6 +20,7 @@ import (
 	accounts "github.com/jensneuse/graphql-go-tools/examples/federation/accounts/graph"
 	products "github.com/jensneuse/graphql-go-tools/examples/federation/products/graph"
 	reviews "github.com/jensneuse/graphql-go-tools/examples/federation/reviews/graph"
+
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/jensneuse/graphql-go-tools/pkg/engine/datasource/rest_datasource"
@@ -456,7 +457,7 @@ func TestExecutionEngineV2_Execute(t *testing.T) {
 					Path:                  []string{"race"},
 					Arguments: []plan.ArgumentConfiguration{
 						{
-							Name: "name",
+							Name:         "name",
 							RenderConfig: plan.RenderArgumentAsGraphQLValue,
 						},
 					},
@@ -511,7 +512,7 @@ func TestExecutionEngineV2_Execute(t *testing.T) {
 					Path:                  []string{"race"},
 					Arguments: []plan.ArgumentConfiguration{
 						{
-							Name: "name",
+							Name:         "name",
 							RenderConfig: plan.RenderArgumentDefault,
 						},
 					},
@@ -605,7 +606,7 @@ subscription UpdatedPrice {
 
 			if assert.NoError(t, err) {
 				assert.Eventuallyf(t, func() bool {
-					msg := `{"data":{"updatedPrice":{"name":"Trilby","price":%d,"reviews":[{"body":"A highly effective form of birth control.","author":{"id":"1234","username":"User 1234"}}]}}}`
+					msg := `{"data":{"updatedPrice":{"name":"Trilby","price":%d,"reviews":[{"body":"A highly effective form of birth control.","author":{"id":"1234","username":"Me"}}]}}}`
 					price := 10
 					if secondRun {
 						price += 2
@@ -868,7 +869,7 @@ func TestExecutionEngineV2_OperationMW(t *testing.T) {
 			expectedResponse: `{"data":{"hero":{"name":"Luke Skywalker"}}}`,
 		}
 
-		type key struct {}
+		type key struct{}
 		var userRoleKey key
 
 		authorizationMiddleware := func(next OperationHandler) OperationHandler {
@@ -901,7 +902,7 @@ func TestExecutionEngineV2_OperationMW(t *testing.T) {
 			defer cancel()
 
 			originalExpResponse := testCase.expectedResponse
-			defer func() {testCase.expectedResponse = originalExpResponse}()
+			defer func() { testCase.expectedResponse = originalExpResponse }()
 
 			testCase.expectedResponse = `{"errors":[{"message":"access denied"}]}`
 
@@ -1055,7 +1056,7 @@ func newFederationEngine(ctx context.Context, setup *federationSetup, enableData
 		}),
 		Factory: &graphql_datasource.Factory{
 			BatchFactory: graphql_datasource.NewBatchFactory(),
-			HTTPClient: httpclient.DefaultNetHttpClient,
+			HTTPClient:   httpclient.DefaultNetHttpClient,
 		},
 	}
 
@@ -1099,7 +1100,7 @@ func newFederationEngine(ctx context.Context, setup *federationSetup, enableData
 		}),
 		Factory: &graphql_datasource.Factory{
 			BatchFactory: graphql_datasource.NewBatchFactory(),
-			HTTPClient: httpclient.DefaultNetHttpClient,
+			HTTPClient:   httpclient.DefaultNetHttpClient,
 		},
 	}
 
@@ -1121,7 +1122,7 @@ func newFederationEngine(ctx context.Context, setup *federationSetup, enableData
 			},
 			{
 				TypeName:   "User",
-				FieldNames: []string{"id", "username", "reviews"},
+				FieldNames: []string{"id", "reviews"},
 			},
 			{
 				TypeName:   "Product",
@@ -1143,7 +1144,7 @@ func newFederationEngine(ctx context.Context, setup *federationSetup, enableData
 		}),
 		Factory: &graphql_datasource.Factory{
 			BatchFactory: graphql_datasource.NewBatchFactory(),
-			HTTPClient: httpclient.DefaultNetHttpClient,
+			HTTPClient:   httpclient.DefaultNetHttpClient,
 		},
 	}
 
