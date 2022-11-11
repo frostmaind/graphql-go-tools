@@ -149,7 +149,7 @@ func (h *Handler) Handle(ctx context.Context) {
 
 			h.handleConnectionError("could not read message from client")
 		} else if message != nil {
-			h.logger.Info(
+			h.logger.Debug(
 				"Receive message",
 				abstractlogger.String("type", message.Type),
 				abstractlogger.String("payload", string(message.Payload)),
