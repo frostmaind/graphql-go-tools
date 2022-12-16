@@ -244,7 +244,17 @@ func (h *Handler) handleStart(ctx context.Context, id string, payload []byte) {
 		return
 	}
 
-	go h.handleNonSubscriptionOperation(ctx, id, executor)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				h.logger.Error("broken query", abstractlogger.ByteString("payload", payload))
+				h.handleError(id, graphql.RequestErrorsFromError(fmt.Errorf("%s", r)))
+			}
+
+		}()
+
+		h.handleNonSubscriptionOperation(ctx, id, executor)
+	}()
 }
 
 func (h *Handler) handleOnBeforeStart(executor Executor) error {
