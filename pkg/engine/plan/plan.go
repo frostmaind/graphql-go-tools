@@ -1107,11 +1107,6 @@ func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *
 					Path: []string{key},
 				})
 			}
-		case "context":
-			contextKey := path[0]
-			variableName, _ = variables.AddVariable(&resolve.OperationContextVariable{
-				Path: []string{contextKey},
-			})
 		}
 		return variableName
 	})

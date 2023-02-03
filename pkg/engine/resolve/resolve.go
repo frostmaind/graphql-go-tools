@@ -50,7 +50,6 @@ var (
 	errNonNullableFieldValueIsNull = errors.New("non Nullable field value is null")
 	errTypeNameSkipped             = errors.New("skipped because of __typename condition")
 	errHeaderPathInvalid           = errors.New("invalid header path: header variables must be of this format: .request.header.{{ key }} ")
-	errOperationContextPathInvalid = errors.New("invalid context path: context variables must be of this format: .context.{{ key }} ")
 
 	ErrUnableToResolve = errors.New("unable to resolve operation")
 )
@@ -122,21 +121,21 @@ type Context struct {
 	context.Context
 	OperationName     string
 	OperationDocument *ast.Document // Operation document is readonly, it's not expected to modify the field
-	Variables        []byte
-	Request          Request
-	pathElements     [][]byte
-	responseElements []string
-	lastFetchID      int
-	patches          []patch
-	usedBuffers      []*bytes.Buffer
-	currentPatch     int
-	maxPatch         int
-	pathPrefix       []byte
-	dataLoader       *dataLoader
-	beforeFetchHook  BeforeFetchHook
-	afterFetchHook   AfterFetchHook
-	position         Position
-	RenameTypeNames  []RenameTypeName
+	Variables         []byte
+	Request           Request
+	pathElements      [][]byte
+	responseElements  []string
+	lastFetchID       int
+	patches           []patch
+	usedBuffers       []*bytes.Buffer
+	currentPatch      int
+	maxPatch          int
+	pathPrefix        []byte
+	dataLoader        *dataLoader
+	beforeFetchHook   BeforeFetchHook
+	afterFetchHook    AfterFetchHook
+	position          Position
+	RenameTypeNames   []RenameTypeName
 }
 
 type Request struct {
