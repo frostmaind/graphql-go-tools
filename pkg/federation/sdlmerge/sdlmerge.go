@@ -2,10 +2,11 @@ package sdlmerge
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/wundergraph/graphql-go-tools/pkg/asttransform"
 	"github.com/wundergraph/graphql-go-tools/pkg/astvalidation"
 	"github.com/wundergraph/graphql-go-tools/pkg/engine/plan"
-	"strings"
 
 	"github.com/wundergraph/graphql-go-tools/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/pkg/astnormalization"
@@ -134,8 +135,8 @@ func (m *normalizer) setupWalkers() {
 		// visitors for cleaning up federated duplicated fields and directives
 		{
 			newRemoveFieldDefinitions("external"),
-			newRemoveDuplicateFieldedSharedTypesVisitor(),
-			newRemoveDuplicateFieldlessSharedTypesVisitor(),
+			//newRemoveDuplicateFieldedSharedTypesVisitor(),
+			//newRemoveDuplicateFieldlessSharedTypesVisitor(),
 			newRemoveInterfaceDefinitionDirective("key"),
 			newRemoveObjectTypeDefinitionDirective("key"),
 			newRemoveFieldDefinitionDirective("provides", "requires"),
