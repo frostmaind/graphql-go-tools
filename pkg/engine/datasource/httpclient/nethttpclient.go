@@ -19,11 +19,6 @@ const (
 	AcceptEncodingHeader  = "Accept-Encoding"
 )
 
-const (
-	ContentEncodingHeader = "Content-Encoding"
-	AcceptEncodingHeader  = "Accept-Encoding"
-)
-
 var (
 	DefaultNetHttpClient = &http.Client{
 		Timeout: time.Second * 10,
