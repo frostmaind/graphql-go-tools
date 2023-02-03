@@ -14,6 +14,14 @@ type FieldDefinitionList struct {
 	RBRACE position.Position // }
 }
 
+func (f FieldDefinitionList) Clone() FieldDefinitionList {
+	return FieldDefinitionList{
+		LBRACE: f.LBRACE,
+		Refs:   cloneRefs(f.Refs),
+		RBRACE: f.RBRACE,
+	}
+}
+
 type FieldDefinition struct {
 	Description             Description        // optional e.g. "FieldDefinition is ..."
 	Name                    ByteSliceReference // e.g. foo
@@ -23,6 +31,19 @@ type FieldDefinition struct {
 	Type                    int                      // e.g. String
 	HasDirectives           bool
 	Directives              DirectiveList // e.g. @foo
+}
+
+func (f FieldDefinition) Clone() FieldDefinition {
+	return FieldDefinition{
+		Description:             f.Description,
+		Name:                    f.Name,
+		HasArgumentsDefinitions: f.HasArgumentsDefinitions,
+		ArgumentsDefinition:     f.ArgumentsDefinition.Clone(),
+		Colon:                   f.Colon,
+		Type:                    f.Type,
+		HasDirectives:           f.HasDirectives,
+		Directives:              f.Directives.Clone(),
+	}
 }
 
 func (d *Document) FieldDefinitionNameBytes(ref int) ByteSlice {

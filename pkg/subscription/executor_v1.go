@@ -25,7 +25,7 @@ func NewExecutorV1Pool(executionHandler *execution.Handler) *ExecutorV1Pool {
 	}
 }
 
-func (e *ExecutorV1Pool) Get(payload []byte) (Executor, error) {
+func (e *ExecutorV1Pool) Get(_ context.Context, payload []byte) (Executor, error) {
 	engineExecutor, node, executionContext, err := e.ExecutionHandler.Handle(payload, []byte(""))
 	if err != nil {
 		return nil, err

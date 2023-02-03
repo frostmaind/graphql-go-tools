@@ -11,6 +11,14 @@ type ObjectValue struct {
 	RBRACE position.Position
 }
 
+func (o ObjectValue) Clone() ObjectValue {
+	return ObjectValue{
+		LBRACE: o.LBRACE,
+		Refs:   cloneRefs(o.Refs),
+		RBRACE: o.RBRACE,
+	}
+}
+
 func (d *Document) CopyObjectValue(ref int) int {
 	refs := d.NewEmptyRefs()
 	for _, r := range d.ObjectValues[ref].Refs {

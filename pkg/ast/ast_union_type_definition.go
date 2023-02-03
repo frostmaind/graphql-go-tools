@@ -23,6 +23,19 @@ type UnionTypeDefinition struct {
 	FieldsDefinition    FieldDefinitionList // contains a single field: { __typename: String! }
 }
 
+func (u UnionTypeDefinition) Clone() UnionTypeDefinition {
+	return UnionTypeDefinition{
+		Description:         u.Description,
+		UnionLiteral:        u.UnionLiteral,
+		Name:                u.Name,
+		HasDirectives:       u.HasDirectives,
+		Directives:          u.Directives.Clone(),
+		Equals:              u.Equals,
+		HasUnionMemberTypes: u.HasUnionMemberTypes,
+		UnionMemberTypes:    u.UnionMemberTypes.Clone(),
+	}
+}
+
 func (d *Document) UnionTypeDefinitionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.UnionTypeDefinitions[ref].Name)
 }

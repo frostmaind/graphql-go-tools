@@ -15,6 +15,14 @@ type ArgumentList struct {
 	RPAREN position.Position
 }
 
+func (a ArgumentList) Clone() ArgumentList {
+	return ArgumentList{
+		LPAREN: a.LPAREN,
+		Refs:   cloneRefs(a.Refs),
+		RPAREN: a.RPAREN,
+	}
+}
+
 type Argument struct {
 	Name  ByteSliceReference // e.g. foo
 	Colon position.Position  // :

@@ -19,6 +19,20 @@ type Field struct {
 	Position      position.Position
 }
 
+func (f Field) Clone() Field {
+	return Field{
+		Alias:         f.Alias,
+		Name:          f.Name,
+		HasArguments:  f.HasArguments,
+		Arguments:     f.Arguments.Clone(),
+		HasDirectives: f.HasDirectives,
+		Directives:    f.Directives.Clone(),
+		SelectionSet:  f.SelectionSet,
+		HasSelections: f.HasSelections,
+		Position:      f.Position,
+	}
+}
+
 func (d *Document) CopyField(ref int) int {
 	var arguments ArgumentList
 	var directives DirectiveList

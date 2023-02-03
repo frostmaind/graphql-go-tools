@@ -12,11 +12,26 @@ type DirectiveList struct {
 	Refs []int
 }
 
+func (d DirectiveList) Clone() DirectiveList {
+	return DirectiveList{
+		Refs: cloneRefs(d.Refs),
+	}
+}
+
 type Directive struct {
 	At           position.Position  // @
 	Name         ByteSliceReference // e.g. include
 	HasArguments bool
 	Arguments    ArgumentList // e.g. (if: true)
+}
+
+func (d Directive) Clone() Directive {
+	return Directive{
+		At:           d.At,
+		Name:         d.Name,
+		HasArguments: d.HasArguments,
+		Arguments:    d.Arguments.Clone(),
+	}
 }
 
 func (l *DirectiveList) HasDirectiveByName(document *Document, name string) bool {

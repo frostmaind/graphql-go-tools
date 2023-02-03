@@ -32,4 +32,38 @@ func TestDirectiveIncludeVisitor(t *testing.T) {
 					}
 				}`)
 	})
+	t.Run("apply `include` directive that contains variable", func(t *testing.T) {
+		runVariables(directiveIncludeSkip, testDefinition, `
+				query ApplyInclude($includeVar: Boolean!, $notInclude: Boolean!){
+					dog {
+						name: nickname
+						includeName: name @include(if: $includeVar)
+						notIncludeName: name @include(if: $notInclude)
+					}
+				}`,
+			`{"includeVar": true, "notInclude": false}`,`
+				query ApplyInclude($includeVar: Boolean!, $notInclude: Boolean!) {
+					dog {
+						name: nickname
+						includeName: name
+					}
+				}`)
+	})
+	t.Run("apply `skip` directive that contains variable", func(t *testing.T) {
+		runVariables(directiveIncludeSkip, testDefinition, `
+				query ApplyInclude($skipVar: Boolean!, $notSkipVar: Boolean!){
+					dog {
+						name: nickname
+						skipName: name @skip(if: $skipVar)
+						notSkipName: name @skip(if: $notSkipVar)
+					}
+				}`,
+			`{"skipVar": true, "notSkipVar": false}`,`
+				query ApplyInclude($skipVar: Boolean!, $notSkipVar: Boolean!) {
+					dog {
+						name: nickname
+						notSkipName: name
+					}
+				}`)
+	})
 }

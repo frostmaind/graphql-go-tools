@@ -8,6 +8,14 @@ type ListValue struct {
 	RBRACK position.Position // ]
 }
 
+func (l ListValue) Clone() ListValue {
+	return ListValue{
+		LBRACK: l.LBRACK,
+		Refs:   cloneRefs(l.Refs),
+		RBRACK: l.RBRACK,
+	}
+}
+
 func (d *Document) CopyListValue(ref int) int {
 	refs := d.NewEmptyRefs()
 	for _, r := range d.ListValues[ref].Refs {

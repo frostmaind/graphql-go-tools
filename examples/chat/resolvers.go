@@ -31,10 +31,6 @@ func (r *resolver) Subscription() SubscriptionResolver {
 	return &subscriptionResolver{r}
 }
 
-func (r *resolver) __Directive() __DirectiveResolver {
-	return directiveResolver{r}
-}
-
 func New() Config {
 	return Config{
 		Resolvers: &resolver{

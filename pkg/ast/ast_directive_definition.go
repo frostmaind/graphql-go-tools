@@ -27,6 +27,19 @@ type Repeatable struct {
 	Position     position.Position
 }
 
+func (d DirectiveDefinition) Clone() DirectiveDefinition {
+	return DirectiveDefinition{
+		Description:             d.Description,
+		DirectiveLiteral:        d.DirectiveLiteral,
+		At:                      d.At,
+		Name:                    d.Name,
+		HasArgumentsDefinitions: d.HasArgumentsDefinitions,
+		ArgumentsDefinition:     d.ArgumentsDefinition.Clone(),
+		On:                      d.On,
+		DirectiveLocations:      d.DirectiveLocations,
+	}
+}
+
 func (d *Document) DirectiveDefinitionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.DirectiveDefinitions[ref].Name)
 }

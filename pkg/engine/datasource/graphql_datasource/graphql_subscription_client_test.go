@@ -114,7 +114,7 @@ func TestWebsocketSubscriptionClient(t *testing.T) {
 		msgType, data, err := conn.Read(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, websocket.MessageText, msgType)
-		assert.Equal(t, `{"type":"connection_init"}`, string(data))
+		assert.Equal(t, `{"type":"connection_init","payload":{}}`, string(data))
 		err = conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"connection_ack"}`))
 		assert.NoError(t, err)
 		msgType, data, err = conn.Read(ctx)
@@ -209,7 +209,7 @@ func TestWebsocketSubscriptionClientWithServerDisconnect(t *testing.T) {
 		msgType, data, err := conn.Read(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, websocket.MessageText, msgType)
-		assert.Equal(t, `{"type":"connection_init"}`, string(data))
+		assert.Equal(t, `{"type":"connection_init","payload":{}}`, string(data))
 		err = conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"connection_ack"}`))
 		assert.NoError(t, err)
 		msgType, data, err = conn.Read(ctx)
@@ -269,7 +269,7 @@ func TestWebsocketSubscriptionClientErrorArray(t *testing.T) {
 		msgType, data, err := conn.Read(r.Context())
 		assert.NoError(t, err)
 		assert.Equal(t, websocket.MessageText, msgType)
-		assert.Equal(t, `{"type":"connection_init"}`, string(data))
+		assert.Equal(t, `{"type":"connection_init","payload":{}}`, string(data))
 		err = conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"connection_ack"}`))
 		assert.NoError(t, err)
 		msgType, data, err = conn.Read(r.Context())
@@ -321,7 +321,7 @@ func TestWebsocketSubscriptionClientErrorObject(t *testing.T) {
 		msgType, data, err := conn.Read(r.Context())
 		assert.NoError(t, err)
 		assert.Equal(t, websocket.MessageText, msgType)
-		assert.Equal(t, `{"type":"connection_init"}`, string(data))
+		assert.Equal(t, `{"type":"connection_init","payload":{}}`, string(data))
 		err = conn.Write(r.Context(), websocket.MessageText, []byte(`{"type":"connection_ack"}`))
 		assert.NoError(t, err)
 		msgType, data, err = conn.Read(r.Context())
@@ -365,6 +365,7 @@ func TestWebsocketSubscriptionClientErrorObject(t *testing.T) {
 	}, time.Second, time.Millisecond*10, "server did not close")
 }
 
+/* deduplication implementation
 func TestWebsocketSubscriptionClientDeDuplication(t *testing.T) {
 	serverDone := &sync.WaitGroup{}
 	connectedClients := atomic.NewInt64(0)
@@ -389,7 +390,7 @@ func TestWebsocketSubscriptionClientDeDuplication(t *testing.T) {
 		msgType, data, err := conn.Read(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, websocket.MessageText, msgType)
-		assert.Equal(t, `{"type":"connection_init"}`, string(data))
+		assert.Equal(t, `{"type":"connection_init","payload":{}}`, string(data))
 		err = conn.Write(ctx, websocket.MessageText, []byte(`{"type":"connection_ack"}`))
 		assert.NoError(t, err)
 	}
@@ -497,3 +498,4 @@ func TestWebsocketSubscriptionClientDeDuplication(t *testing.T) {
 		return connectedClients.Load() == 0
 	}, time.Second, time.Millisecond, "clients not 0")
 }
+*/

@@ -203,6 +203,10 @@ func (s *Schema) IntrospectionResponse(out io.Writer) error {
 	return json.NewEncoder(out).Encode(introspectionData)
 }
 
+func (s *Schema) ASTDocument() *ast.Document {
+	return &s.document
+}
+
 func (s *Schema) GetAllFieldArguments(skipFieldFuncs ...SkipFieldFunc) []TypeFieldArguments {
 	objectTypeExtensions := make(map[string]ast.ObjectTypeExtension)
 	for _, objectTypeExtension := range s.document.ObjectTypeExtensions {

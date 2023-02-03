@@ -31,6 +31,17 @@ type FragmentDefinition struct {
 	HasSelections   bool
 }
 
+func (f FragmentDefinition) Clone() FragmentDefinition {
+	return FragmentDefinition{
+		FragmentLiteral: f.FragmentLiteral,
+		Name:            f.Name,
+		TypeCondition:   f.TypeCondition,
+		Directives:      f.Directives.Clone(),
+		SelectionSet:    f.SelectionSet,
+		HasSelections:   f.HasSelections,
+	}
+}
+
 func (d *Document) FragmentDefinitionRef(byName ByteSlice) (ref int, exists bool) {
 	for i := range d.FragmentDefinitions {
 		if bytes.Equal(byName, d.Input.ByteSlice(d.FragmentDefinitions[i].Name)) {

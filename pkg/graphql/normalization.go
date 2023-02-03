@@ -1,7 +1,12 @@
 package graphql
 
 import (
+	"bytes"
+
+	"github.com/wundergraph/graphql-go-tools/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/pkg/astnormalization"
+	"github.com/wundergraph/graphql-go-tools/pkg/astparser"
+	"github.com/wundergraph/graphql-go-tools/pkg/astprinter"
 	"github.com/wundergraph/graphql-go-tools/pkg/operationreport"
 )
 
@@ -39,10 +44,42 @@ func (r *Request) Normalize(schema *Schema) (result NormalizationResult, err err
 	}
 
 	r.isNormalized = true
-
 	r.Variables = r.document.Input.Variables
+	if err := normalizeDuplicatedFieldRefs(&r.document); err != nil {
+		return NormalizationResult{}, err
+	}
 
 	return NormalizationResult{Successful: true, Errors: nil}, nil
+}
+
+func normalizeDuplicatedFieldRefs(operation *ast.Document) error {
+	if len(operation.Index.ReplacedFragmentSpreads) == 0 {
+		// Fragments have not been spread, there is no reason to normalize duplicated field refs
+		return nil
+	}
+
+	buf := &bytes.Buffer{}
+
+	if err := astprinter.Print(operation, nil, buf); err != nil {
+		return err
+	}
+
+	rawQuery := buf.Bytes()
+	variables := make([]byte, len(operation.Input.Variables))
+	copy(variables, operation.Input.Variables)
+
+	operation.Reset()
+	operation.Input.ResetInputBytes(rawQuery)
+	operation.Input.Variables = variables
+	report := &operationreport.Report{}
+	parser := astparser.NewParser()
+	parser.Parse(operation, report)
+
+	if report.HasErrors() {
+		return report
+	}
+
+	return nil
 }
 
 func normalizationResultFromReport(report operationreport.Report) (NormalizationResult, error) {

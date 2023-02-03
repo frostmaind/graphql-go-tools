@@ -40,6 +40,34 @@ func (i *Index) Reset() {
 	}
 }
 
+func (i *Index) Clone() Index {
+	queryTypeName := i.QueryTypeName.Clone()
+	mutationTypeName := i.MutationTypeName.Clone()
+	subscriptionTypeName := i.SubscriptionTypeName.Clone()
+
+	nodesMap := make(map[uint64][]Node, len(i.nodes))
+	for k := range i.nodes {
+		nodes := make([]Node, len(i.nodes[k]))
+		copy(nodes, i.nodes[k])
+		nodesMap[k] = nodes
+	}
+
+	replacedFragmentSpreads := make([]int, len(i.ReplacedFragmentSpreads))
+	copy(replacedFragmentSpreads, i.ReplacedFragmentSpreads)
+
+	mergedTypeExtensions := make([]Node, len(i.MergedTypeExtensions))
+	copy(mergedTypeExtensions, i.MergedTypeExtensions)
+
+	return Index{
+		QueryTypeName:           queryTypeName,
+		MutationTypeName:        mutationTypeName,
+		SubscriptionTypeName:    subscriptionTypeName,
+		nodes:                   nodesMap,
+		ReplacedFragmentSpreads: replacedFragmentSpreads,
+		MergedTypeExtensions:    mergedTypeExtensions,
+	}
+}
+
 func (i *Index) AddNodeStr(name string, node Node) {
 	hash := xxhash.Sum64String(name)
 	_, exists := i.nodes[hash]

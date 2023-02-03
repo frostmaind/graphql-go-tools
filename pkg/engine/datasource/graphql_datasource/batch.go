@@ -46,7 +46,7 @@ func (b *BatchFactory) CreateBatch(inputs [][]byte) (resolve.DataSourceBatch, er
 
 	responseMappings, err := b.multiplexBatch(resultedInput, inputs)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	return &Batch{

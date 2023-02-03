@@ -401,6 +401,7 @@ type objectFetchConfiguration struct {
 	isSubscription     bool
 	fieldRef           int
 	fieldDefinitionRef int
+	typeName           string
 }
 
 func (v *Visitor) AllowVisitor(kind astvisitor.VisitorKind, ref int, visitor interface{}) bool {
@@ -419,6 +420,9 @@ func (v *Visitor) AllowVisitor(kind astvisitor.VisitorKind, ref int, visitor int
 	for _, config := range v.planners {
 		if config.planner == visitor && config.hasPath(path) {
 			switch kind {
+			case astvisitor.EnterField, astvisitor.LeaveField:
+				typeName := v.Walker.EnclosingTypeDefinition.NameString(v.Definition)
+				return config.hasPathType(path, typeName)
 			case astvisitor.EnterSelectionSet, astvisitor.LeaveSelectionSet:
 				return !config.isExitPath(path)
 			default:
@@ -1103,6 +1107,11 @@ func (v *Visitor) resolveInputTemplates(config objectFetchConfiguration, input *
 					Path: []string{key},
 				})
 			}
+		case "context":
+			contextKey := path[0]
+			variableName, _ = variables.AddVariable(&resolve.OperationContextVariable{
+				Path: []string{contextKey},
+			})
 		}
 		return variableName
 	})
@@ -1219,6 +1228,7 @@ func (v *Visitor) configureFetch(internal objectFetchConfiguration, external Fet
 		DataSourceIdentifier:  []byte(dataSourceType),
 		ProcessResponseConfig: external.ProcessResponseConfig,
 		DisableDataLoader:     external.DisableDataLoader,
+		OnTypeName:            []byte(internal.typeName),
 	}
 
 	// if a field depends on an exported variable, data loader needs to be disabled
@@ -1414,6 +1424,15 @@ func (p *plannerConfiguration) hasPath(path string) bool {
 	return false
 }
 
+func (p *plannerConfiguration) hasPathType(path string, typeName string) bool {
+	for i := range p.paths {
+		if p.paths[i].path == path && p.paths[i].typeName == typeName {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *plannerConfiguration) isExitPath(path string) bool {
 	for i := range p.paths {
 		if p.paths[i].path == path {
@@ -1478,6 +1497,7 @@ func (p *plannerConfiguration) hasRootNode(typeName, fieldName string) bool {
 
 type pathConfiguration struct {
 	path              string
+	typeName          string
 	exitPlannerOnNode bool
 }
 
@@ -1496,20 +1516,26 @@ func (c *configurationVisitor) EnterField(ref int) {
 	parent := c.walker.Path.DotDelimitedString()
 	current := parent + "." + fieldAliasOrName
 	root := c.walker.Ancestors[0]
+	parentPath := parent
+
+	if onTypeName := c.resolveOnTypeName(); len(onTypeName) != 0 {
+		parentPath += "." + string(onTypeName)
+	}
+
 	if root.Kind != ast.NodeKindOperationDefinition {
 		return
 	}
 	isSubscription := c.isSubscription(root.Ref, current)
 	for i, planner := range c.planners {
-		if planner.hasParent(parent) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
+		if planner.hasParent(parentPath) && planner.hasRootNode(typeName, fieldName) && planner.planner.DataSourcePlanningBehavior().MergeAliasedRootNodes {
 			// same parent + root node = root sibling
-			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
+			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current, typeName: typeName})
 			c.fieldBuffers[ref] = planner.bufferID
 			return
 		}
 		if planner.hasPath(parent) && planner.hasChildNode(typeName, fieldName) {
 			// has parent path + has child node = child
-			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current})
+			c.planners[i].paths = append(c.planners[i].paths, pathConfiguration{path: current, typeName: typeName})
 			return
 		}
 	}
@@ -1525,11 +1551,12 @@ func (c *configurationVisitor) EnterField(ref int) {
 			planner := c.config.DataSources[i].Factory.Planner(c.ctx)
 			c.planners = append(c.planners, plannerConfiguration{
 				bufferID:   bufferID,
-				parentPath: parent,
+				parentPath: parentPath,
 				planner:    planner,
 				paths: []pathConfiguration{
 					{
-						path: current,
+						path:     current,
+						typeName: typeName,
 					},
 				},
 				dataSourceConfiguration: config,
@@ -1544,6 +1571,7 @@ func (c *configurationVisitor) EnterField(ref int) {
 				isSubscription:     isSubscription,
 				fieldRef:           ref,
 				fieldDefinitionRef: fieldDefinition,
+				typeName:           typeName,
 			})
 			return
 		}
@@ -1598,6 +1626,18 @@ type requiredFieldsVisitor struct {
 	config                *Configuration
 	operationName         string
 	skipFieldPaths        []string
+}
+
+func (c *configurationVisitor) resolveOnTypeName() []byte {
+	if len(c.walker.Ancestors) < 2 {
+		return nil
+	}
+	inlineFragment := c.walker.Ancestors[len(c.walker.Ancestors)-2]
+	if inlineFragment.Kind != ast.NodeKindInlineFragment {
+		return nil
+	}
+
+	return c.operation.InlineFragmentTypeConditionName(inlineFragment.Ref)
 }
 
 func (r *requiredFieldsVisitor) EnterDocument(operation, definition *ast.Document) {

@@ -10,6 +10,13 @@ type ScalarTypeExtension struct {
 	ScalarTypeDefinition
 }
 
+func (s ScalarTypeExtension) Clone() ScalarTypeExtension {
+	return ScalarTypeExtension{
+		ExtendLiteral:        s.ExtendLiteral,
+		ScalarTypeDefinition: s.ScalarTypeDefinition.Clone(),
+	}
+}
+
 func (d *Document) ScalarTypeExtensionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.ScalarTypeExtensions[ref].Name)
 }

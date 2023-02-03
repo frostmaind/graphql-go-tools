@@ -15,3 +15,9 @@ func indexOf(refs []int, ref int) (int, bool) {
 func deleteRef(refs *[]int, index int) {
 	*refs = append((*refs)[:index], (*refs)[index+1:]...)
 }
+
+func cloneRefs(refs []int) []int {
+	copied := make([]int, len(refs))
+	copy(copied, refs)
+	return copied
+}

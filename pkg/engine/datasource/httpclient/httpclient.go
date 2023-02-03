@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strconv"
 
 	"github.com/buger/jsonparser"
 	byte_template "github.com/jensneuse/byte-template"
@@ -86,7 +87,7 @@ func wrapQuotesIfString(b []byte) []byte {
 			return b
 		}
 	}
-	return quotes.WrapBytes(b)
+	return []byte(strconv.Quote(string(b)))
 }
 
 func SetInputURL(input, url []byte) []byte {

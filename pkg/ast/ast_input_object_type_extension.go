@@ -10,6 +10,13 @@ type InputObjectTypeExtension struct {
 	InputObjectTypeDefinition
 }
 
+func (i InputObjectTypeExtension) Clone() InputObjectTypeExtension {
+	return InputObjectTypeExtension{
+		ExtendLiteral:             i.ExtendLiteral,
+		InputObjectTypeDefinition: i.InputObjectTypeDefinition.Clone(),
+	}
+}
+
 func (d *Document) InputObjectTypeExtensionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.InputObjectTypeExtensions[ref].Name)
 }

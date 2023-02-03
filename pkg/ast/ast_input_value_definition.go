@@ -13,6 +13,14 @@ type InputValueDefinitionList struct {
 	RPAREN position.Position // )
 }
 
+func (i InputValueDefinitionList) Clone() InputValueDefinitionList {
+	return InputValueDefinitionList{
+		LPAREN: i.LPAREN,
+		Refs:   cloneRefs(i.Refs),
+		RPAREN: i.RPAREN,
+	}
+}
+
 type DefaultValue struct {
 	IsDefined bool
 	Equals    position.Position // =
@@ -27,6 +35,18 @@ type InputValueDefinition struct {
 	DefaultValue  DefaultValue       // e.g. = "Bar"
 	HasDirectives bool
 	Directives    DirectiveList // e.g. @baz
+}
+
+func (i InputValueDefinition) Clone() InputValueDefinition {
+	return InputValueDefinition{
+		Description:   i.Description,
+		Name:          i.Name,
+		Colon:         i.Colon,
+		Type:          i.Type,
+		DefaultValue:  i.DefaultValue,
+		HasDirectives: i.HasDirectives,
+		Directives:    i.Directives.Clone(),
+	}
 }
 
 func (d *Document) InputValueDefinitionNameBytes(ref int) ByteSlice {

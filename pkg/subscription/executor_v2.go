@@ -5,19 +5,51 @@ import (
 	"context"
 	"sync"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/wundergraph/graphql-go-tools/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/pkg/engine/resolve"
 	"github.com/wundergraph/graphql-go-tools/pkg/graphql"
 )
 
+type ExecutorOptionsV2Fn func(*ExecutorOptionsV2)
+
+type ExecutorOptionsV2 struct {
+	documentCache    *lru.Cache
+	executionOptions []graphql.ExecutionOptionsV2
+}
+
+func WithDocumentCache(cache *lru.Cache) ExecutorOptionsV2Fn {
+	return func(opts *ExecutorOptionsV2) {
+		opts.documentCache = cache
+	}
+}
+
+func WithExecutionV2Option(executionOption graphql.ExecutionOptionsV2) ExecutorOptionsV2Fn {
+	return func(opts *ExecutorOptionsV2) {
+		opts.executionOptions = append(opts.executionOptions, executionOption)
+	}
+}
+
 // ExecutorV2Pool - provides reusable executors
 type ExecutorV2Pool struct {
+	options              *ExecutorOptionsV2
 	engine               *graphql.ExecutionEngineV2
 	executorPool         *sync.Pool
 	connectionInitReqCtx context.Context // connectionInitReqCtx - holds original request context used to establish websocket connection
 }
 
-func NewExecutorV2Pool(engine *graphql.ExecutionEngineV2, connectionInitReqCtx context.Context) *ExecutorV2Pool {
+func NewExecutorV2Pool(
+	engine *graphql.ExecutionEngineV2,
+	connectionInitReqCtx context.Context,
+	optionFns ...ExecutorOptionsV2Fn,
+) *ExecutorV2Pool {
+	options := new(ExecutorOptionsV2)
+
+	for _, fn := range optionFns {
+		fn(options)
+	}
+
 	return &ExecutorV2Pool{
 		engine: engine,
 		executorPool: &sync.Pool{
@@ -25,12 +57,15 @@ func NewExecutorV2Pool(engine *graphql.ExecutionEngineV2, connectionInitReqCtx c
 				return &ExecutorV2{}
 			},
 		},
+		options:              options,
 		connectionInitReqCtx: connectionInitReqCtx,
 	}
 }
 
-func (e *ExecutorV2Pool) Get(payload []byte) (Executor, error) {
-	operation := graphql.Request{}
+func (e *ExecutorV2Pool) Get(ctx context.Context, payload []byte) (Executor, error) {
+	operation := graphql.Request{
+		DocumentCache: e.options.documentCache,
+	}
 	err := graphql.UnmarshalRequest(bytes.NewReader(payload), &operation)
 	if err != nil {
 		return nil, err
@@ -39,8 +74,9 @@ func (e *ExecutorV2Pool) Get(payload []byte) (Executor, error) {
 	return &ExecutorV2{
 		engine:    e.engine,
 		operation: &operation,
-		context:   context.Background(),
+		context:   ctx,
 		reqCtx:    e.connectionInitReqCtx,
+		options:   e.options,
 	}, nil
 }
 
@@ -51,6 +87,7 @@ func (e *ExecutorV2Pool) Put(executor Executor) error {
 }
 
 type ExecutorV2 struct {
+	options   *ExecutorOptionsV2
 	engine    *graphql.ExecutionEngineV2
 	operation *graphql.Request
 	context   context.Context
@@ -58,13 +95,7 @@ type ExecutorV2 struct {
 }
 
 func (e *ExecutorV2) Execute(writer resolve.FlushWriter) error {
-	options := make([]graphql.ExecutionOptionsV2, 0)
-	switch ctx := e.reqCtx.(type) {
-	case *InitialHttpRequestContext:
-		options = append(options, graphql.WithAdditionalHttpHeaders(ctx.Request.Header))
-	}
-
-	return e.engine.Execute(e.context, e.operation, writer, options...)
+	return e.engine.Execute(e.context, e.operation, writer, e.options.executionOptions...)
 }
 
 func (e *ExecutorV2) OperationType() ast.OperationType {
@@ -83,6 +114,6 @@ func (e *ExecutorV2) SetContext(context context.Context) {
 func (e *ExecutorV2) Reset() {
 	e.engine = nil
 	e.operation = nil
-	e.context = context.Background()
+	e.context = context.TODO()
 	e.reqCtx = context.TODO()
 }

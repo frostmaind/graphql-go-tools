@@ -17,6 +17,18 @@ type InputObjectTypeDefinition struct {
 	InputFieldsDefinition    InputValueDefinitionList // e.g. x:Float
 }
 
+func (i InputObjectTypeDefinition) Clone() InputObjectTypeDefinition {
+	return InputObjectTypeDefinition{
+		Description:              i.Description,
+		InputLiteral:             i.InputLiteral,
+		Name:                     i.Name,
+		HasDirectives:            i.HasDirectives,
+		Directives:               i.Directives.Clone(),
+		HasInputFieldsDefinition: i.HasInputFieldsDefinition,
+		InputFieldsDefinition:    i.InputFieldsDefinition.Clone(),
+	}
+}
+
 func (d *Document) InputObjectTypeDefinitionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.InputObjectTypeDefinitions[ref].Name)
 }

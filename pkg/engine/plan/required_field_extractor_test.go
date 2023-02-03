@@ -61,6 +61,19 @@ func TestRequiredFieldExtractor_GetAllFieldRequires(t *testing.T) {
 			{TypeName: "Review", FieldName: "title", RequiresFields: []string{"id", "author"}},
 		})
 	})
+	t.Run("Entity with multiple separated primary keys", func(t *testing.T) {
+		run(t, `
+		type Review @key(fields: "id") @key(fields: "author"){
+			id: Int!
+			body: String!
+			title: String
+			author: String!
+		}
+		`, FieldConfigurations{
+			{TypeName: "Review", FieldName: "body", RequiresFields: []string{"id", "author"}},
+			{TypeName: "Review", FieldName: "title", RequiresFields: []string{"id", "author"}},
+		})
+	})
 	t.Run("Entity object extension without non-primary external fields", func(t *testing.T) {
 		run(t, `
 		extend type Review @key(fields: "id"){

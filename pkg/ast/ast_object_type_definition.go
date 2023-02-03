@@ -11,6 +11,12 @@ type TypeList struct {
 	Refs []int // Type
 }
 
+func (t TypeList) Clone() TypeList {
+	return TypeList{
+		Refs: cloneRefs(t.Refs),
+	}
+}
+
 type ObjectTypeDefinition struct {
 	Description          Description        // optional, e.g. "type Foo is ..."
 	TypeLiteral          position.Position  // type
@@ -20,6 +26,19 @@ type ObjectTypeDefinition struct {
 	Directives           DirectiveList // e.g. @foo
 	HasFieldDefinitions  bool
 	FieldsDefinition     FieldDefinitionList // { foo:Bar bar(baz:String) }
+}
+
+func (o ObjectTypeDefinition) Clone() ObjectTypeDefinition {
+	return ObjectTypeDefinition{
+		Description:          o.Description,
+		TypeLiteral:          o.TypeLiteral,
+		Name:                 o.Name,
+		ImplementsInterfaces: o.ImplementsInterfaces.Clone(),
+		HasDirectives:        o.HasDirectives,
+		Directives:           o.Directives.Clone(),
+		HasFieldDefinitions:  o.HasFieldDefinitions,
+		FieldsDefinition:     o.FieldsDefinition.Clone(),
+	}
 }
 
 func (d *Document) ObjectTypeDefinitionNameBytes(ref int) ByteSlice {

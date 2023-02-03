@@ -30,6 +30,22 @@ func (i *Input) Reset() {
 	i.TextPosition.Reset()
 }
 
+func (i *Input) Clone() Input {
+	rawBytes := make([]byte, len(i.RawBytes))
+	copy(rawBytes, i.RawBytes)
+
+	variables := make([]byte, len(i.Variables))
+	copy(variables, i.Variables)
+
+	return Input{
+		RawBytes:      rawBytes,
+		Length:        i.Length,
+		InputPosition: i.InputPosition,
+		TextPosition:  i.TextPosition,
+		Variables:     variables,
+	}
+}
+
 // ResetInputBytes empties the input and sets it to bytes argument
 func (i *Input) ResetInputBytes(bytes []byte) {
 	i.Reset()
@@ -97,6 +113,12 @@ func (b ByteSlice) String() string {
 
 func (b ByteSlice) MarshalJSON() ([]byte, error) {
 	return append(append(literal.QUOTE, b...), literal.QUOTE...), nil
+}
+
+func (b ByteSlice) Clone() ByteSlice {
+	cloned := make(ByteSlice, len(b))
+	copy(cloned, b)
+	return  cloned
 }
 
 type ByteSlices []ByteSlice

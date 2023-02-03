@@ -116,14 +116,16 @@ func newInternalExecutionContext() *internalExecutionContext {
 	}
 }
 
-func (e *internalExecutionContext) prepare(ctx context.Context, variables []byte, request resolve.Request) {
+func (e *internalExecutionContext) prepare(ctx context.Context, operationRequest *Request) {
 	e.setContext(ctx)
-	e.setVariables(variables)
-	e.setRequest(request)
+	e.setOperationRequest(operationRequest)
 }
 
-func (e *internalExecutionContext) setRequest(request resolve.Request) {
-	e.resolveContext.Request = request
+func (e *internalExecutionContext) setOperationRequest(operationRequest *Request) {
+	e.resolveContext.Variables = operationRequest.Variables
+	e.resolveContext.OperationDocument, _ = operationRequest.OperationDocument()
+	e.resolveContext.OperationName = operationRequest.OperationName
+	e.resolveContext.Request = operationRequest.request
 }
 
 func (e *internalExecutionContext) setContext(ctx context.Context) {
@@ -146,6 +148,8 @@ type ExecutionEngineV2 struct {
 	resolver                     *resolve.Resolver
 	internalExecutionContextPool sync.Pool
 	executionPlanCache           *lru.Cache
+	operationMiddleware          OperationMiddleware
+	//rootFieldMiddleware          resolve.RootFieldMiddleware
 }
 
 type WebsocketBeforeStartHook interface {
@@ -193,12 +197,18 @@ func WithAdditionalHttpHeaders(headers http.Header, excludeByKeys ...string) Exe
 	}
 }
 
+type OperationHandler func(ctx context.Context, operation *Request, writer resolve.FlushWriter) error
+type OperationMiddleware func(next OperationHandler) OperationHandler
+
 func NewExecutionEngineV2(ctx context.Context, logger abstractlogger.Logger, engineConfig EngineV2Configuration) (*ExecutionEngineV2, error) {
 	executionPlanCache, err := lru.New(1024)
 	if err != nil {
 		return nil, err
 	}
 	fetcher := resolve.NewFetcher(engineConfig.dataLoaderConfig.EnableSingleFlightLoader)
+	rootFieldMiddleware := processRootFieldMiddleware(engineConfig.rootFieldMiddleware...)
+	resolver := resolve.New(ctx, fetcher, engineConfig.dataLoaderConfig.EnableDataLoader)
+	resolver.SetRootFieldMiddleware(rootFieldMiddleware)
 
 	introspectionCfg, err := introspection_datasource.NewIntrospectionConfigFactory(&engineConfig.schema.document)
 	if err != nil {
@@ -214,13 +224,14 @@ func NewExecutionEngineV2(ctx context.Context, logger abstractlogger.Logger, eng
 		logger:   logger,
 		config:   engineConfig,
 		planner:  plan.NewPlanner(ctx, engineConfig.plannerConfig),
-		resolver: resolve.New(ctx, fetcher, engineConfig.dataLoaderConfig.EnableDataLoader),
+		resolver: resolver,
 		internalExecutionContextPool: sync.Pool{
 			New: func() interface{} {
 				return newInternalExecutionContext()
 			},
 		},
-		executionPlanCache: executionPlanCache,
+		executionPlanCache:  executionPlanCache,
+		operationMiddleware: processOperationMiddleware(),
 	}, nil
 }
 
@@ -244,31 +255,39 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 		return result.Errors
 	}
 
-	execContext := e.getExecutionCtx()
-	defer e.putExecutionCtx(execContext)
+	operationHandler := e.operationMiddleware(func(ctx context.Context, operation *Request, writer resolve.FlushWriter) error {
+		execContext := e.getExecutionCtx()
+		defer e.putExecutionCtx(execContext)
 
-	execContext.prepare(ctx, operation.Variables, operation.request)
+		execContext.prepare(ctx, operation)
 
-	for i := range options {
-		options[i](execContext)
-	}
+		for i := range options {
+			options[i](execContext)
+		}
 
-	var report operationreport.Report
-	cachedPlan := e.getCachedPlan(execContext, &operation.document, &e.config.schema.document, operation.OperationName, &report)
-	if report.HasErrors() {
-		return report
-	}
+		var report operationreport.Report
+		cachedPlan := e.getCachedPlan(execContext, &operation.document, &e.config.schema.document, operation.OperationName, &report)
+		if report.HasErrors() {
+			return report
+		}
 
-	switch p := cachedPlan.(type) {
-	case *plan.SynchronousResponsePlan:
-		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer)
-	case *plan.SubscriptionResponsePlan:
-		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
-	default:
-		return errors.New("execution of operation is not possible")
-	}
+		switch p := cachedPlan.(type) {
+		case *plan.SynchronousResponsePlan:
+			err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer)
+		case *plan.SubscriptionResponsePlan:
+			err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
+		default:
+			return errors.New("execution of operation is not possible")
+		}
 
-	return err
+		return err
+	})
+
+	return operationHandler(ctx, operation, writer)
+}
+
+func (e *ExecutionEngineV2) UseOperation(mw OperationMiddleware) {
+	e.operationMiddleware = processOperationMiddleware(e.operationMiddleware, mw)
 }
 
 func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string, report *operationreport.Report) plan.Plan {
@@ -284,14 +303,15 @@ func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operati
 
 	cacheKey := hash.Sum64()
 
+	e.plannerMu.Lock()
+	defer e.plannerMu.Unlock()
+
 	if cached, ok := e.executionPlanCache.Get(cacheKey); ok {
 		if p, ok := cached.(plan.Plan); ok {
 			return p
 		}
 	}
 
-	e.plannerMu.Lock()
-	defer e.plannerMu.Unlock()
 	planResult := e.planner.Plan(operation, definition, operationName, report)
 	if report.HasErrors() {
 		return nil
@@ -313,4 +333,38 @@ func (e *ExecutionEngineV2) getExecutionCtx() *internalExecutionContext {
 func (e *ExecutionEngineV2) putExecutionCtx(ctx *internalExecutionContext) {
 	ctx.reset()
 	e.internalExecutionContextPool.Put(ctx)
+}
+
+func processOperationMiddleware(middlewares ...OperationMiddleware) OperationMiddleware {
+	middleware := OperationMiddleware(func(next OperationHandler) OperationHandler {
+		return next
+	})
+
+	// the first middleware is the outer most middleware and runs first.
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		previousMW := middleware
+		currentMW := middlewares[i]
+		middleware = func(next OperationHandler) OperationHandler {
+			return previousMW(currentMW(next))
+		}
+	}
+
+	return middleware
+}
+
+func processRootFieldMiddleware(middlewares ...resolve.RootFieldMiddleware) resolve.RootFieldMiddleware {
+	middleware := resolve.RootFieldMiddleware(func(next resolve.RootResolver) resolve.RootResolver {
+		return next
+	})
+
+	// the first middleware is the outer most middleware and runs first.
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		previousMW := middleware
+		currentMW := middlewares[i]
+		middleware = func(next resolve.RootResolver) resolve.RootResolver {
+			return previousMW(currentMW(next))
+		}
+	}
+
+	return middleware
 }

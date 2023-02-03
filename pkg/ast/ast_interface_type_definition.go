@@ -24,6 +24,18 @@ type InterfaceTypeDefinition struct {
 	FieldsDefinition     FieldDefinitionList // optional, e.g. { name: String }
 }
 
+func (i InterfaceTypeDefinition) Clone() InterfaceTypeDefinition {
+	return InterfaceTypeDefinition{
+		Description:         i.Description,
+		InterfaceLiteral:    i.InterfaceLiteral,
+		Name:                i.Name,
+		HasDirectives:       i.HasDirectives,
+		Directives:          i.Directives.Clone(),
+		HasFieldDefinitions: i.HasFieldDefinitions,
+		FieldsDefinition:    i.FieldsDefinition.Clone(),
+	}
+}
+
 func (d *Document) InterfaceTypeDefinitionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.InterfaceTypeDefinitions[ref].Name)
 }

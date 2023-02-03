@@ -7,11 +7,14 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/wundergraph/graphql-go-tools/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/pkg/astparser"
 	"github.com/wundergraph/graphql-go-tools/pkg/engine/resolve"
 	"github.com/wundergraph/graphql-go-tools/pkg/middleware/operation_complexity"
 	"github.com/wundergraph/graphql-go-tools/pkg/operationreport"
+	"github.com/wundergraph/graphql-go-tools/pkg/pool"
 )
 
 const (
@@ -44,6 +47,8 @@ type Request struct {
 	request      resolve.Request
 
 	validForSchema map[uint64]ValidationResult
+
+	DocumentCache *lru.Cache
 }
 
 func UnmarshalRequest(reader io.Reader, request *Request) error {
@@ -103,13 +108,31 @@ func (r *Request) parseQueryOnce() (report operationreport.Report) {
 		return report
 	}
 
-	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
-	if !report.HasErrors() {
-		// If the given query has problems, and we failed to parse it,
-		// we shouldn't mark it as parsed. It can be misleading for
-		// the rest of the components.
-		r.isParsed = true
+	hash := pool.Hash64.Get()
+	hash.Reset()
+	defer pool.Hash64.Put(hash)
+	_, _ = hash.Write([]byte(r.Query))
+	cacheKey := hash.Sum64()
+
+	r.isParsed = true
+
+	if r.DocumentCache != nil {
+		if cached, ok := r.DocumentCache.Get(cacheKey); ok {
+			if doc, ok := cached.(*ast.Document); ok {
+				cloned := doc.Clone()
+				r.document = *cloned
+				return report
+			}
+		}
 	}
+
+	r.document, report = astparser.ParseGraphqlDocumentString(r.Query)
+
+	if r.DocumentCache != nil && !report.HasErrors() {
+		cloned := r.document.Clone()
+		r.DocumentCache.Add(cacheKey, cloned)
+	}
+
 	return report
 }
 
@@ -199,4 +222,13 @@ func (r *Request) OperationType() (OperationType, error) {
 	}
 
 	return OperationTypeUnknown, nil
+}
+
+func (r *Request) OperationDocument() (*ast.Document, error) {
+	report := r.parseQueryOnce()
+	if report.HasErrors() {
+		return nil, report
+	}
+
+	return &r.document, nil
 }

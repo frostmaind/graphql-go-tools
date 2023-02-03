@@ -16,6 +16,16 @@ type ScalarTypeDefinition struct {
 	Directives    DirectiveList // optional, e.g. @foo
 }
 
+func (s ScalarTypeDefinition) Clone() ScalarTypeDefinition {
+	return ScalarTypeDefinition{
+		Description:   s.Description,
+		ScalarLiteral: s.ScalarLiteral,
+		Name:          s.Name,
+		HasDirectives: s.HasDirectives,
+		Directives:    s.Directives.Clone(),
+	}
+}
+
 func (d *Document) ScalarTypeDefinitionNameBytes(ref int) ByteSlice {
 	return d.Input.ByteSlice(d.ScalarTypeDefinitions[ref].Name)
 }

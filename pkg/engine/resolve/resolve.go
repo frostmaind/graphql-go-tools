@@ -17,6 +17,7 @@ import (
 	errors "golang.org/x/xerrors"
 
 	"github.com/wundergraph/graphql-go-tools/internal/pkg/unsafebytes"
+	"github.com/wundergraph/graphql-go-tools/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/pkg/fastbuffer"
 	"github.com/wundergraph/graphql-go-tools/pkg/lexer/literal"
 	"github.com/wundergraph/graphql-go-tools/pkg/pool"
@@ -49,6 +50,7 @@ var (
 	errNonNullableFieldValueIsNull = errors.New("non Nullable field value is null")
 	errTypeNameSkipped             = errors.New("skipped because of __typename condition")
 	errHeaderPathInvalid           = errors.New("invalid header path: header variables must be of this format: .request.header.{{ key }} ")
+	errOperationContextPathInvalid = errors.New("invalid context path: context variables must be of this format: .context.{{ key }} ")
 
 	ErrUnableToResolve = errors.New("unable to resolve operation")
 )
@@ -104,6 +106,9 @@ type HookContext struct {
 	CurrentPath []byte
 }
 
+type RootResolver func(ctx *Context, writer io.Writer) error
+type RootFieldMiddleware func(next RootResolver) RootResolver
+
 type BeforeFetchHook interface {
 	OnBeforeFetch(ctx HookContext, input []byte)
 }
@@ -115,6 +120,8 @@ type AfterFetchHook interface {
 
 type Context struct {
 	context.Context
+	OperationName     string
+	OperationDocument *ast.Document // Operation document is readonly, it's not expected to modify the field
 	Variables        []byte
 	Request          Request
 	pathElements     [][]byte
@@ -138,16 +145,17 @@ type Request struct {
 
 func NewContext(ctx context.Context) *Context {
 	return &Context{
-		Context:      ctx,
-		Variables:    make([]byte, 0, 4096),
-		pathPrefix:   make([]byte, 0, 4096),
-		pathElements: make([][]byte, 0, 16),
-		patches:      make([]patch, 0, 48),
-		usedBuffers:  make([]*bytes.Buffer, 0, 48),
-		currentPatch: -1,
-		maxPatch:     -1,
-		position:     Position{},
-		dataLoader:   nil,
+		Context:           ctx,
+		OperationDocument: nil,
+		Variables:         make([]byte, 0, 4096),
+		pathPrefix:        make([]byte, 0, 4096),
+		pathElements:      make([][]byte, 0, 16),
+		patches:           make([]patch, 0, 48),
+		usedBuffers:       make([]*bytes.Buffer, 0, 48),
+		currentPatch:      -1,
+		maxPatch:          -1,
+		position:          Position{},
+		dataLoader:        nil,
 	}
 }
 
@@ -174,18 +182,20 @@ func (c *Context) Clone() Context {
 		copy(patches[i].data, c.patches[i].data)
 	}
 	return Context{
-		Context:         c.Context,
-		Variables:       variables,
-		Request:         c.Request,
-		pathElements:    pathElements,
-		patches:         patches,
-		usedBuffers:     make([]*bytes.Buffer, 0, 48),
-		currentPatch:    c.currentPatch,
-		maxPatch:        c.maxPatch,
-		pathPrefix:      pathPrefix,
-		beforeFetchHook: c.beforeFetchHook,
-		afterFetchHook:  c.afterFetchHook,
-		position:        c.position,
+		Context:           c.Context,
+		Variables:         variables,
+		Request:           c.Request,
+		pathElements:      pathElements,
+		patches:           patches,
+		usedBuffers:       make([]*bytes.Buffer, 0, 48),
+		currentPatch:      c.currentPatch,
+		maxPatch:          c.maxPatch,
+		pathPrefix:        pathPrefix,
+		beforeFetchHook:   c.beforeFetchHook,
+		afterFetchHook:    c.afterFetchHook,
+		position:          c.position,
+		OperationDocument: c.OperationDocument,
+		OperationName:     c.OperationName,
 	}
 }
 
@@ -207,6 +217,8 @@ func (c *Context) Free() {
 	c.position = Position{}
 	c.dataLoader = nil
 	c.RenameTypeNames = nil
+	c.OperationDocument = nil
+	c.OperationName = ""
 }
 
 func (c *Context) SetBeforeFetchHook(hook BeforeFetchHook) {
@@ -327,6 +339,8 @@ type Resolver struct {
 	hash64Pool        sync.Pool
 	dataloaderFactory *dataLoaderFactory
 	fetcher           *Fetcher
+
+	rootFieldMiddleware RootFieldMiddleware
 }
 
 type inflightFetch struct {
@@ -386,7 +400,14 @@ func New(ctx context.Context, fetcher *Fetcher, enableDataLoader bool) *Resolver
 		dataloaderFactory: newDataloaderFactory(fetcher),
 		fetcher:           fetcher,
 		dataLoaderEnabled: enableDataLoader,
+		rootFieldMiddleware: func(next RootResolver) RootResolver {
+			return next
+		},
 	}
+}
+
+func (r *Resolver) SetRootFieldMiddleware(mw RootFieldMiddleware) {
+	r.rootFieldMiddleware = mw
 }
 
 func (r *Resolver) resolveNode(ctx *Context, node Node, data []byte, bufPair *BufPair) (err error) {
@@ -471,41 +492,44 @@ func extractResponse(responseData []byte, bufPair *BufPair, cfg ProcessResponseC
 	}, responsePaths...)
 }
 
-func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer) (err error) {
+func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer) error {
+	rootFieldHandler := r.rootFieldMiddleware(func(ctx *Context, writer io.Writer) (err error) {
+		buf := r.getBufPair()
+		defer r.freeBufPair(buf)
 
-	buf := r.getBufPair()
-	defer r.freeBufPair(buf)
+		responseBuf := r.getBufPair()
+		defer r.freeBufPair(responseBuf)
 
-	responseBuf := r.getBufPair()
-	defer r.freeBufPair(responseBuf)
+		extractResponse(data, responseBuf, ProcessResponseConfig{ExtractGraphqlResponse: true})
 
-	extractResponse(data, responseBuf, ProcessResponseConfig{ExtractGraphqlResponse: true})
-
-	if data != nil {
-		ctx.lastFetchID = initialValueID
-	}
-
-	if r.dataLoaderEnabled {
-		ctx.dataLoader = r.dataloaderFactory.newDataLoader(responseBuf.Data.Bytes())
-		defer func() {
-			r.dataloaderFactory.freeDataLoader(ctx.dataLoader)
-			ctx.dataLoader = nil
-		}()
-	}
-
-	ignoreData := false
-	err = r.resolveNode(ctx, response.Data, responseBuf.Data.Bytes(), buf)
-	if err != nil {
-		if !errors.Is(err, errNonNullableFieldValueIsNull) {
-			return
+		if data != nil {
+			ctx.lastFetchID = initialValueID
 		}
-		ignoreData = true
-	}
-	if responseBuf.Errors.Len() > 0 {
-		r.MergeBufPairErrors(responseBuf, buf)
-	}
 
-	return writeGraphqlResponse(buf, writer, ignoreData)
+		if r.dataLoaderEnabled {
+			ctx.dataLoader = r.dataloaderFactory.newDataLoader(responseBuf.Data.Bytes())
+			defer func() {
+				r.dataloaderFactory.freeDataLoader(ctx.dataLoader)
+				ctx.dataLoader = nil
+			}()
+		}
+
+		ignoreData := false
+		err = r.resolveNode(ctx, response.Data, responseBuf.Data.Bytes(), buf)
+		if err != nil {
+			if !errors.Is(err, errNonNullableFieldValueIsNull) {
+				return
+			}
+			ignoreData = true
+		}
+		if responseBuf.Errors.Len() > 0 {
+			r.MergeBufPairErrors(responseBuf, buf)
+		}
+
+		return writeGraphqlResponse(buf, writer, ignoreData)
+	})
+
+	return rootFieldHandler(ctx, writer)
 }
 
 func (r *Resolver) ResolveGraphQLSubscription(ctx *Context, subscription *GraphQLSubscription, writer FlushWriter) (err error) {
@@ -520,7 +544,7 @@ func (r *Resolver) ResolveGraphQLSubscription(ctx *Context, subscription *GraphQ
 	copy(subscriptionInput, rendered)
 	r.freeBufPair(buf)
 
-	c, cancel := context.WithCancel(ctx)
+	c, cancel := context.WithCancel(ctx.Context)
 	defer cancel()
 	resolverDone := r.ctx.Done()
 
@@ -1040,10 +1064,13 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 	}
 
 	var set *resultSet
-	if object.Fetch != nil {
+
+	fetch := r.filterObjectFetch(object, data)
+
+	if fetch != nil {
 		set = r.getResultSet()
 		defer r.freeResultSet(set)
-		err = r.resolveFetch(ctx, object.Fetch, data, set)
+		err = r.resolveFetch(ctx, fetch, data, set)
 		if err != nil {
 			return
 		}
@@ -1052,32 +1079,31 @@ func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, obje
 		}
 	}
 
+	if len(object.Path) != 0 {
+		if len(data) == 0 || bytes.Equal(data, literal.NULL) {
+			objectBuf.Reset()
+
+			if object.Nullable {
+				r.resolveNull(objectBuf.Data)
+				return
+			}
+
+			r.addResolveError(ctx, objectBuf)
+			return errNonNullableFieldValueIsNull
+		}
+	}
+
 	fieldBuf := r.getBufPair()
 	defer r.freeBufPair(fieldBuf)
 
-	responseElements := ctx.responseElements
+	responseElements := make([]string, len(ctx.responseElements))
+	copy(responseElements, ctx.responseElements)
 	lastFetchID := ctx.lastFetchID
 
 	typeNameSkip := false
 	first := true
 	skipCount := 0
 	for i := range object.Fields {
-
-		if object.Fields[i].SkipDirectiveDefined {
-			skip, err := jsonparser.GetBoolean(ctx.Variables, object.Fields[i].SkipVariableName)
-			if err == nil && skip {
-				skipCount++
-				continue
-			}
-		}
-
-		if object.Fields[i].IncludeDirectiveDefined {
-			include, err := jsonparser.GetBoolean(ctx.Variables, object.Fields[i].IncludeVariableName)
-			if err != nil || !include {
-				skipCount++
-				continue
-			}
-		}
 
 		var fieldData []byte
 		if set != nil && object.Fields[i].HasBuffer {
@@ -1172,6 +1198,60 @@ func (r *Resolver) freeResultSet(set *resultSet) {
 		delete(set.buffers, i)
 	}
 	r.resultSetPool.Put(set)
+}
+
+func (r *Resolver) filterObjectFetch(object *Object, data []byte) Fetch {
+	if object.Fetch == nil {
+		return nil
+	}
+
+	typeName, _, _, _ := jsonparser.Get(data, "__typename")
+	if len(typeName) == 0 {
+		return object.Fetch
+	}
+
+	requiredBufferIDs := make(map[int]struct{})
+
+	for _, field := range object.Fields {
+		if field.OnTypeName != nil && !bytes.Equal(typeName, field.OnTypeName) {
+			continue
+		}
+
+		requiredBufferIDs[field.BufferID] = struct{}{}
+	}
+
+	switch f := object.Fetch.(type) {
+	case *SingleFetch:
+		if _, ok := requiredBufferIDs[f.BufferId]; ok {
+			return f
+		}
+	case *BatchFetch:
+		if _, ok := requiredBufferIDs[f.Fetch.BufferId]; ok {
+			return f
+		}
+	case *ParallelFetch:
+		fetches := make([]Fetch, 0, len(f.Fetches))
+
+		for _, fetch := range f.Fetches {
+			switch pF := fetch.(type) {
+			case *SingleFetch:
+				if _, ok := requiredBufferIDs[pF.BufferId]; ok {
+					fetches = append(fetches, pF)
+				}
+			case *BatchFetch:
+				if _, ok := requiredBufferIDs[pF.Fetch.BufferId]; ok {
+					fetches = append(fetches, pF)
+				}
+
+			}
+		}
+
+		if len(fetches) > 0 {
+			return &ParallelFetch{Fetches: fetches}
+		}
+	}
+
+	return nil
 }
 
 func (r *Resolver) resolveFetch(ctx *Context, fetch Fetch, data []byte, set *resultSet) (err error) {
@@ -1355,6 +1435,7 @@ type SingleFetch struct {
 	InputTemplate         InputTemplate
 	DataSourceIdentifier  []byte
 	ProcessResponseConfig ProcessResponseConfig
+	OnTypeName            []byte
 }
 
 type ProcessResponseConfig struct {

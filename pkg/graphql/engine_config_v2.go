@@ -18,6 +18,7 @@ type EngineV2Configuration struct {
 	plannerConfig            plan.Configuration
 	websocketBeforeStartHook WebsocketBeforeStartHook
 	dataLoaderConfig         dataLoaderConfig
+	rootFieldMiddleware      []resolve.RootFieldMiddleware
 }
 
 func NewEngineV2Configuration(schema *Schema) EngineV2Configuration {
@@ -32,12 +33,17 @@ func NewEngineV2Configuration(schema *Schema) EngineV2Configuration {
 			EnableSingleFlightLoader: false,
 			EnableDataLoader:         false,
 		},
+		rootFieldMiddleware: nil,
 	}
 }
 
 type dataLoaderConfig struct {
 	EnableSingleFlightLoader bool
 	EnableDataLoader         bool
+}
+
+func (e *EngineV2Configuration) AddRootFieldMiddleware(mw resolve.RootFieldMiddleware) {
+	e.rootFieldMiddleware = append(e.rootFieldMiddleware, mw)
 }
 
 func (e *EngineV2Configuration) AddDataSource(dataSource plan.DataSourceConfiguration) {

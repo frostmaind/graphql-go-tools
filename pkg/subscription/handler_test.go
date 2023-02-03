@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -297,7 +299,19 @@ func TestHandler_Handle(t *testing.T) {
 
 		t.Run("connection_init", func(t *testing.T) {
 			executorPool, _ := setupEngineV2(t, ctx, chatServer.URL)
-			_, client, handlerRoutine := setupSubscriptionHandlerTest(t, executorPool)
+			var initPayloadAuthorization string
+
+			_, client, handlerRoutine := setupSubscriptionHandlerWithInitFuncTest(t, executorPool, func(ctx context.Context, initPayload InitPayload) (context.Context, error) {
+				if initPayloadAuthorization == "" {
+					return ctx, nil
+				}
+
+				if initPayloadAuthorization != initPayload.Authorization() {
+					return nil, fmt.Errorf("unknown user: %s", initPayload.Authorization())
+				}
+
+				return ctx, nil
+			})
 
 			t.Run("should send connection error message when error on read occurrs", func(t *testing.T) {
 				client.prepareConnectionInitMessage().withError().and().send()
@@ -318,6 +332,45 @@ func TestHandler_Handle(t *testing.T) {
 
 			t.Run("should successfully init connection and respond with ack", func(t *testing.T) {
 				client.reconnect().and().prepareConnectionInitMessage().withoutError().and().send()
+
+				ctx, cancelFunc := context.WithCancel(context.Background())
+
+				cancelFunc()
+				require.Eventually(t, handlerRoutine(ctx), 1*time.Second, 5*time.Millisecond)
+
+				expectedMessage := Message{
+					Type: MessageTypeConnectionAck,
+				}
+
+				messagesFromServer := client.readFromServer()
+				assert.Contains(t, messagesFromServer, expectedMessage)
+			})
+
+			t.Run("should send connection error message when error on check initial payload occurrs", func(t *testing.T) {
+				initPayloadAuthorization = "123"
+				defer func() { initPayloadAuthorization = "" }()
+
+				client.reconnect().and().prepareConnectionInitMessageWithPayload([]byte(`{"Authorization": "111"}`)).withoutError().and().send()
+
+				ctx, cancelFunc := context.WithCancel(context.Background())
+
+				cancelFunc()
+				require.Eventually(t, handlerRoutine(ctx), 1*time.Second, 5*time.Millisecond)
+
+				expectedMessage := Message{
+					Type:    MessageTypeConnectionError,
+					Payload: jsonizePayload(t, "failed to accept the websocket connection: unknown user: 111"),
+				}
+
+				messagesFromServer := client.readFromServer()
+				assert.Contains(t, messagesFromServer, expectedMessage)
+			})
+
+			t.Run("should successfully init connection and respond with ack when initial payload successfully occurred ", func(t *testing.T) {
+				initPayloadAuthorization = "123"
+				defer func() { initPayloadAuthorization = "" }()
+
+				client.reconnect().and().prepareConnectionInitMessageWithPayload([]byte(`{"Authorization": "123"}`)).withoutError().and().send()
 
 				ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -446,7 +499,7 @@ func TestHandler_Handle(t *testing.T) {
 				client.prepareStartMessage("1", payload).withoutError().and().send()
 
 				ctx, cancelFunc := context.WithCancel(context.Background())
-				cancelFunc()
+				defer cancelFunc()
 				handlerRoutineFunc := handlerRoutine(ctx)
 				go handlerRoutineFunc()
 
@@ -532,7 +585,7 @@ func TestHandler_Handle(t *testing.T) {
 				go handlerRoutineFunc()
 
 				time.Sleep(10 * time.Millisecond)
-				cancelFunc()
+				defer cancelFunc()
 
 				go sendChatMutation(t, chatServer.URL)
 
@@ -767,16 +820,27 @@ func setupEngineV2(t *testing.T, ctx context.Context, chatServerURL string) (*Ex
 	engine, err := graphql.NewExecutionEngineV2(initCtx, abstractlogger.NoopLogger, engineConf)
 	require.NoError(t, err)
 
-	executorPool := NewExecutorV2Pool(engine, hookHolder.reqCtx)
+	documentCache, err := lru.New(1024)
+	require.NoError(t, err)
+
+	executorPool := NewExecutorV2Pool(engine, hookHolder.reqCtx, WithDocumentCache(documentCache))
 
 	return executorPool, hookHolder
 }
 
 func setupSubscriptionHandlerTest(t *testing.T, executorPool ExecutorPool) (subscriptionHandler *Handler, client *mockClient, routine handlerRoutine) {
+	return setupSubscriptionHandlerWithInitFuncTest(t, executorPool, nil)
+}
+
+func setupSubscriptionHandlerWithInitFuncTest(
+	t *testing.T,
+	executorPool ExecutorPool,
+	initFunc WebsocketInitFunc,
+) (subscriptionHandler *Handler, client *mockClient, routine handlerRoutine) {
 	client = newMockClient()
 
 	var err error
-	subscriptionHandler, err = NewHandler(abstractlogger.NoopLogger, client, executorPool)
+	subscriptionHandler, err = NewHandlerWithInitFunc(abstractlogger.NoopLogger, client, executorPool, initFunc)
 	require.NoError(t, err)
 
 	routine = func(ctx context.Context) func() bool {

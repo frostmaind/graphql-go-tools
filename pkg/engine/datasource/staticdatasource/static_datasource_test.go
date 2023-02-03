@@ -35,6 +35,7 @@ func TestStaticDataSourcePlanning(t *testing.T) {
 						DataSourceIdentifier: []byte("staticdatasource.Source"),
 						DisableDataLoader:    true,
 						DisallowSingleFlight: true,
+						OnTypeName:           []byte("Query"),
 					},
 				},
 			},

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/buger/jsonparser"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -346,6 +347,8 @@ func TestStreamAndDefer(t *testing.T) {
 								VariableKind:       ObjectVariableKind,
 								VariableSourcePath: []string{"id"},
 								Renderer:           NewGraphQLVariableRenderer(`{"type":"number"}`),
+								RenderVariableAsGraphQLValue: true,
+								VariableValueType: jsonparser.Number,
 							},
 						},
 					},

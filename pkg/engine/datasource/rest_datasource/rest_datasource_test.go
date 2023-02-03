@@ -139,6 +139,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						DataSource:           &Source{},
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
 						DisableDataLoader:    true,
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -159,6 +160,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 									),
 									DataSourceIdentifier: []byte("rest_datasource.Source"),
 									DisableDataLoader:    true,
+									OnTypeName:           []byte("Friend"),
 								},
 								Fields: []*resolve.Field{
 									{
@@ -259,14 +261,17 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 							&resolve.ContextVariable{
 								Path:     []string{"idVariable"},
 								Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string"]}`),
+								JsonValueType:      jsonparser.String,
 							},
 							&resolve.ContextVariable{
 								Path:     []string{"a"},
 								Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string","null"]}`),
+								JsonValueType:      jsonparser.String,
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
 						DisableDataLoader:    true,
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -485,14 +490,18 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 									&resolve.ContextVariable{
 										Path:     []string{"idVariable"},
 										Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string"]}`),
+										Path:               []string{"idVariable"},
+										JsonValueType:      jsonparser.String,
 									},
 									&resolve.ContextVariable{
 										Path:     []string{"a"},
 										Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string","null"]}`),
+										JsonValueType:      jsonparser.String,
 									},
 								),
 								DataSourceIdentifier: []byte("rest_datasource.Source"),
 								DisableDataLoader:    true,
+								OnTypeName:           []byte("Query"),
 							},
 							&resolve.SingleFetch{
 								BufferId:   3,
@@ -502,14 +511,17 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 									&resolve.ContextVariable{
 										Path:     []string{"idVariable"},
 										Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string"]}`),
+										JsonValueType:      jsonparser.String,
 									},
 									&resolve.ContextVariable{
 										Path:     []string{"d"},
 										Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string","null"]}`),
+										JsonValueType:      jsonparser.String,
 									},
 								),
 								DataSourceIdentifier: []byte("rest_datasource.Source"),
 								DisableDataLoader:    true,
+								OnTypeName:           []byte("Query"),
 							},
 						},
 					},
@@ -530,10 +542,12 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 												&resolve.ContextVariable{
 													Path:     []string{"b"},
 													Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string"]}`),
+													JsonValueType:      jsonparser.String,
 												},
 											),
 											DataSourceIdentifier: []byte("rest_datasource.Source"),
 											DisableDataLoader:    true,
+											OnTypeName:           []byte("Friend"),
 										},
 										&resolve.SingleFetch{
 											BufferId:   2,
@@ -543,10 +557,12 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 												&resolve.ContextVariable{
 													Path:     []string{"c"},
 													Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string"]}`),
+													JsonValueType:      jsonparser.String,
 												},
 											),
 											DataSourceIdentifier: []byte("rest_datasource.Source"),
 											DisableDataLoader:    true,
+											OnTypeName:           []byte("Friend"),
 										},
 									},
 								},
@@ -658,14 +674,17 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 							&resolve.ContextVariable{
 								Path:     []string{"a"},
 								Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string"]}`),
+								JsonValueType:      jsonparser.String,
 							},
 							&resolve.ContextVariable{
 								Path:     []string{"b"},
 								Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string","null"]}`),
+								JsonValueType:      jsonparser.String,
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
 						DisableDataLoader:    true,
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -796,6 +815,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						DisallowSingleFlight: true,
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
 						DisableDataLoader:    true,
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -863,6 +883,7 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 						},
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
 						DisableDataLoader:    true,
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -932,14 +953,17 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 							&resolve.ContextVariable{
 								Path:     []string{"a"},
 								Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string","null"]}`),
+								JsonValueType:      jsonparser.String,
 							},
 							&resolve.ContextVariable{
 								Path:     []string{"idVariable"},
 								Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["string"]}`),
+								JsonValueType:      jsonparser.String,
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
 						DisableDataLoader:    true,
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -1025,10 +1049,13 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 							&resolve.ContextVariable{
 								Path:     []string{"a"},
 								Renderer: resolve.NewPlainVariableRendererWithValidation(`{"type":["array","null"],"items":{"type":["string","null"]}}`),
+								JsonValueType:      jsonparser.Array,
+								ArrayJsonValueType: jsonparser.String,
 							},
 						),
 						DataSourceIdentifier: []byte("rest_datasource.Source"),
 						DisableDataLoader:    true,
+						OnTypeName:           []byte("Query"),
 					},
 					Fields: []*resolve.Field{
 						{
@@ -1081,6 +1108,88 @@ func TestFastHttpJsonDataSourcePlanning(t *testing.T) {
 					TypeName:              "Query",
 					FieldName:             "withArrayArguments",
 					DisableDefaultMapping: true,
+				},
+			},
+		},
+	))
+	t.Run("get request with array query", datasourcetesting.RunTest(schema, arrayArgumentOperation, "ArgumentQuery",
+		&plan.SynchronousResponsePlan{
+			Response: &resolve.GraphQLResponse{
+				Data: &resolve.Object{
+					Fetch: &resolve.SingleFetch{
+						BufferId:   0,
+						Input:      `{"method":"GET","url":"https://example.com/friend/$$0$$"}`,
+						DataSource: &Source{},
+						Variables: resolve.NewVariables(
+							&resolve.ContextVariable{
+								Path:               []string{"a"},
+								JsonValueType:      jsonparser.Array,
+								ArrayJsonValueType: jsonparser.String,
+								RenderAsArrayCSV:   true,
+							},
+						),
+						DataSourceIdentifier: []byte("rest_datasource.Source"),
+						OnTypeName:           []byte("Query"),
+					},
+					Fields: []*resolve.Field{
+						{
+							BufferID:  0,
+							HasBuffer: true,
+							Name:      []byte("withArrayArguments"),
+							Position: resolve.Position{
+								Line:   3,
+								Column: 4,
+							},
+							Value: &resolve.Object{
+								Nullable: true,
+								Fields: []*resolve.Field{
+									{
+										Name: []byte("name"),
+										Value: &resolve.String{
+											Path:     []string{"name"},
+											Nullable: true,
+										},
+										Position: resolve.Position{
+											Line:   4,
+											Column: 5,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		plan.Configuration{
+			DataSources: []plan.DataSourceConfiguration{
+				{
+					RootNodes: []plan.TypeField{
+						{
+							TypeName:   "Query",
+							FieldNames: []string{"withArrayArguments"},
+						},
+					},
+					Custom: ConfigJSON(Configuration{
+						Fetch: FetchConfiguration{
+							URL:    "https://example.com/friend/{{ .arguments.names }}",
+							Method: "GET",
+						},
+					}),
+					Factory: &Factory{},
+				},
+			},
+			Fields: []plan.FieldConfiguration{
+				{
+					TypeName:              "Query",
+					FieldName:             "withArrayArguments",
+					DisableDefaultMapping: true,
+					Arguments: []plan.ArgumentConfiguration{
+						{
+							Name:         "names",
+							RenderConfig: plan.RenderArgumentAsArrayCSV,
+						},
+					},
 				},
 			},
 			DisableResolveFieldPositions: true,
