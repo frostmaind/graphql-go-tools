@@ -450,7 +450,7 @@ func (ec *executionContext) _Query_me(ctx context.Context, field graphql.Collect
 		if data, ok := tmp.(*model.User); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/jensneuse/graphql-go-tools/examples/federation/accounts/graph/model.User`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/wundergraph/graphql-go-tools/examples/federation/accounts/graph/model.User`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)

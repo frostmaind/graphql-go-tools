@@ -3,9 +3,9 @@ package authorization
 import (
 	"testing"
 
-	"github.com/jensneuse/graphql-go-tools/pkg/astparser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wundergraph/graphql-go-tools/pkg/astparser"
 )
 
 func TestAuthVisitor(t *testing.T) {
