@@ -171,6 +171,18 @@ func (c *WebSocketGraphQLSubscriptionClient) Subscribe(ctx context.Context, opti
 	}
 	msgType, connectionAckMsg, err := conn.Read(connectionInitCtx)
 	if err != nil {
+		return err
+	}
+	if msgType != websocket.MessageText {
+		return fmt.Errorf("unexpected msg type")
+	}
+	connectionAck, err := jsonparser.GetString(connectionAckMsg, "type")
+	if err != nil {
+		return err
+	}
+	if connectionAck != "connection_ack" {
+		return fmt.Errorf("expected connection_ack, got: %s", connectionAck)
+	}
 
 	if err := waitForAck(ctx, conn); err != nil {
 		return err
