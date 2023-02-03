@@ -41,9 +41,9 @@ func MergeSDLs(SDLs ...string) (string, error) {
 	rawDocs := make([]string, 0, len(SDLs)+1)
 	rawDocs = append(rawDocs, rootOperationTypeDefinitions)
 	rawDocs = append(rawDocs, SDLs...)
-	if validationError := validateSubgraphs(rawDocs[1:]); validationError != nil {
-		return "", validationError
-	}
+	//if validationError := validateSubgraphs(rawDocs[1:]); validationError != nil {
+	//	return "", validationError
+	//}
 	if normalizationError := normalizeSubgraphs(rawDocs[1:]); normalizationError != nil {
 		return "", normalizationError
 	}
@@ -135,8 +135,8 @@ func (m *normalizer) setupWalkers() {
 		// visitors for cleaning up federated duplicated fields and directives
 		{
 			newRemoveFieldDefinitions("external"),
-			//newRemoveDuplicateFieldedSharedTypesVisitor(),
-			//newRemoveDuplicateFieldlessSharedTypesVisitor(),
+			newRemoveDuplicateFieldedSharedTypesVisitor(),
+			newRemoveDuplicateFieldlessSharedTypesVisitor(),
 			newRemoveInterfaceDefinitionDirective("key"),
 			newRemoveObjectTypeDefinitionDirective("key"),
 			newRemoveFieldDefinitionDirective("provides", "requires"),
