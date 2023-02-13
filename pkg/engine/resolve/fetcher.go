@@ -61,10 +61,10 @@ func prepareMultiPartInputData(ctx *Context, input *fastbuffer.FastBuffer) (*fas
 		return nil, err
 	}
 
-	body, err = jsonparser.Set(body, []byte(`"`+ctx.OperationName+`"`), "operationName")
-	if err != nil {
-		return nil, err
-	}
+	//body, err = jsonparser.Set(body, []byte(`"`+ctx.OperationName+`"`), "operationName")
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	newBody := &bytes.Buffer{}
 	writer := multipart.NewWriter(newBody)
