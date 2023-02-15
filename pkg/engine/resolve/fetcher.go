@@ -71,33 +71,28 @@ func prepareMultiPartInputData(ctx *Context, input *fastbuffer.FastBuffer) (*fas
 		return nil, err
 	}
 
-	_, err = part.Write(body)
-	if err != nil {
+	if _, err = part.Write(body); err != nil {
 		return nil, err
 	}
 
-	part, err = writer.CreateFormField("map")
-	if err != nil {
+	if part, err = writer.CreateFormField("map"); err != nil {
 		return nil, err
 	}
-	_, err = part.Write(ctx.Map)
-	if err != nil {
+
+	if _, err = part.Write(ctx.Map); err != nil {
 		return nil, err
 	}
 
 	for key, file := range ctx.Files {
-		part, err = writer.CreateFormFile(key, file.Filename)
-		if err != nil {
+		if part, err = writer.CreateFormFile(key, file.Filename); err != nil {
 			return nil, err
 		}
-		_, err = io.Copy(part, file.File)
-		if err != nil {
+		if _, err = io.Copy(part, file.File); err != nil {
 			return nil, err
 		}
 	}
 
-	err = writer.Close()
-	if err != nil {
+	if err = writer.Close(); err != nil {
 		return nil, err
 	}
 

@@ -122,7 +122,7 @@ type AfterFetchHook interface {
 	OnError(ctx HookContext, output []byte, singleFlight bool)
 }
 
-type UploadedFile struct {
+type FileUpload struct {
 	File     multipart.File
 	Filename string
 	Size     int64
@@ -134,7 +134,7 @@ type Context struct {
 	OperationDocument *ast.Document // Operation document is readonly, it's not expected to modify the field
 	Variables         []byte
 	Map               json.RawMessage
-	Files             map[string]*UploadedFile
+	Files             map[string]FileUpload
 	Request           Request
 	pathElements      [][]byte
 	responseElements  []string

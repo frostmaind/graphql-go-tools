@@ -43,7 +43,7 @@ type Request struct {
 	Query         string          `json:"query"`
 
 	Map   json.RawMessage
-	Files map[string]*resolve.UploadedFile
+	Files map[string]resolve.FileUpload
 
 	document     ast.Document
 	isParsed     bool
@@ -89,14 +89,14 @@ func UnmarshalMultiPartRequest(r *http.Request, request *Request, maxMemory int6
 	}
 
 	if request.Files == nil {
-		request.Files = map[string]*resolve.UploadedFile{}
+		request.Files = map[string]resolve.FileUpload{}
 	}
 
 	for key, _ := range uploadMaps {
 		if file, header, err := r.FormFile(key); err != nil {
 			return err
 		} else {
-			request.Files[key] = &resolve.UploadedFile{
+			request.Files[key] = resolve.FileUpload{
 				File:     file,
 				Size:     header.Size,
 				Filename: header.Filename,
