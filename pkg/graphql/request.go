@@ -106,6 +106,7 @@ func UnmarshalMultiPartRequest(r *http.Request, request *Request, maxMemory int6
 
 	return nil
 }
+
 func UnmarshalHttpRequest(r *http.Request, request *Request, maxMemory int64) error {
 	request.request.Header = r.Header
 
@@ -148,7 +149,7 @@ func (r *Request) CalculateComplexity(complexityCalculator ComplexityCalculator,
 	return complexityCalculator.Calculate(&r.document, &schema.document)
 }
 
-func (r Request) Print(writer io.Writer) (n int, err error) {
+func (r *Request) Print(writer io.Writer) (n int, err error) {
 	report := r.parseQueryOnce()
 	if report.HasErrors() {
 		return 0, report
