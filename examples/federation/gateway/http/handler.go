@@ -69,7 +69,3 @@ func (g *GraphQLHTTPRequestHandler) isWebsocketUpgrade(r *http.Request) bool {
 	}
 	return false
 }
-
-func (g *GraphQLHTTPRequestHandler) GetMaxMemory() int64 {
-	return g.maxMemory
-}
