@@ -48,22 +48,24 @@ func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Wr
 		return err
 	}
 
-	request.Header.Add("accept", "application/json")
-	request.Header.Add("content-type", "application/json")
-
 	if headers != nil {
 		err = jsonparser.ObjectEach(headers, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 			_, err := jsonparser.ArrayEach(value, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
 				if err != nil {
 					return
 				}
-				request.Header.Set(string(key), string(value))
+				request.Header.Add(string(key), string(value))
 			})
 			return err
 		})
 		if err != nil {
 			return err
 		}
+	}
+
+	request.Header.Add("accept", "application/json")
+	if len(request.Header.Get("content-type")) == 0 {
+		request.Header.Add("content-type", "application/json")
 	}
 
 	if queryParams != nil {
