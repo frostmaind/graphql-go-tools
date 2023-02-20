@@ -90,7 +90,11 @@ func prepareMultiPartInputData(ctx *Context, input *fastbuffer.FastBuffer) (*fas
 		if _, err = io.Copy(part, file.File); err != nil {
 			return nil, err
 		}
+		_ = file.File.Close()
 	}
+
+	ctx.Map = nil
+	ctx.Files = nil
 
 	if err = writer.Close(); err != nil {
 		return nil, err
